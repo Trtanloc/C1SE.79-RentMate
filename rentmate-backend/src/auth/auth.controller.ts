@@ -13,11 +13,8 @@ export class AuthController {
     const result = await this.authService.register(registerDto);
     return {
       success: true,
-      message: 'Registration successful',
-      data: {
-        user: result.user,
-        token: result.token,
-      },
+      message: 'User registered successfully',
+      data: result,
     };
   }
 
@@ -27,20 +24,14 @@ export class AuthController {
     return {
       success: true,
       message: 'Login successful',
-      data: {
-        user: result.user,
-        token: result.token,
-      },
+      data: result,
     };
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout() {
-    await this.authService.logout();
-    return {
-      success: true,
-      message: 'Logout successful',
-    };
+    const result = await this.authService.logout();
+    return { success: true, message: result.message, data: null };
   }
 }

@@ -31,6 +31,7 @@ const App = () => {
         </Routes>
       </main>
       <ChatBox />
+      <ChatBox />
     </div>
   );
 };
