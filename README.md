@@ -90,7 +90,7 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 - Protected routes (dashboard)
 - Responsive UI matching Sprint 1 design tokens (buttons, forms, property cards)
 - Property dashboard for landlords/admins with create form and listing overview
-- Floating “RentMate Virtual Assistant” chat widget for tenants (AI + owner chat modes)
+- Floating "RentMate Virtual Assistant" chat widget for tenants (AI + owner chat modes)
 
 ## 4. Docker Images
 - Backend Dockerfile located in `rentmate-backend/Dockerfile`
@@ -108,3 +108,4 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 - JWT secret defaults to `supersecretkey` - override in `.env`.
 - Ensure `GEMINI_API_KEY` is configured on the backend server (never expose it to the frontend).
 - Contracts, transactions, and AI chat modules now ship as part of this sprint; extend them with additional intents or analytics as needed.
+- Future sprints can extend modules for contracts, payments, and AI recommendations.

@@ -1,15 +1,16 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { User } from '../users/user.entity';
-import { JwtPayload } from './types/jwt-payload.type';
+import { User } from '../users/entities/user.entity';
+
+type JwtPayload = {
+  sub: number;
+  email: string;
+  role: string;
+};
 
 const sanitizeUser = (user: User) => {
   const { password, ...rest } = user;
@@ -24,15 +25,28 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    try {
-      const user = await this.usersService.create(registerDto);
-      return sanitizeUser(user);
-    } catch (error) {
-      if (error instanceof ConflictException) {
-        throw error;
-      }
-      throw error;
+    const existingUser = await this.usersService.findByEmail(registerDto.email);
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
     }
+
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const user = await this.usersService.create({
+      ...registerDto,
+      password: hashedPassword,
+    });
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const token = await this.jwtService.signAsync(payload);
+    return {
+      token,
+      user: sanitizeUser(user),
+    };
   }
 
   private async validateUser(email: string, password: string): Promise<User> {
@@ -68,6 +82,10 @@ export class AuthService {
 
   async logout() {
     // Stateless JWT logout stub; client should discard token.
+    return { message: 'Logout successful' };
+  }
+
+  async logout() {
     return { message: 'Logout successful' };
   }
 }

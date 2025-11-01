@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ChatBox from './components/ChatBox.jsx';
 
 const App = () => {
   return (
@@ -26,10 +27,11 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </div>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </main>
+  <ChatBox />
+</div>
   );
 };
 
