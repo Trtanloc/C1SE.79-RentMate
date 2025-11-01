@@ -8,20 +8,45 @@ export declare class AuthController {
         success: boolean;
         message: string;
         data: {
-            user: import("../users/entities/user.entity").User;
             token: string;
+            user: {
+                id: number;
+                fullName: string;
+                email: string;
+                phone?: string;
+                role: import("../common/enums/user-role.enum").UserRole;
+                isActive: boolean;
+                createdAt: Date;
+                updatedAt: Date;
+                properties: import("../properties/entities/property.entity").Property[];
+                contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
+                contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
+            };
         };
     }>;
     login(loginDto: LoginDto): Promise<{
         success: boolean;
         message: string;
         data: {
-            user: import("../users/entities/user.entity").User;
             token: string;
+            user: {
+                id: number;
+                fullName: string;
+                email: string;
+                phone?: string;
+                role: import("../common/enums/user-role.enum").UserRole;
+                isActive: boolean;
+                createdAt: Date;
+                updatedAt: Date;
+                properties: import("../properties/entities/property.entity").Property[];
+                contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
+                contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
+            };
         };
     }>;
     logout(): Promise<{
         success: boolean;
         message: string;
+        data: any;
     }>;
 }

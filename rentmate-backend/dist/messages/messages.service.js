@@ -30,8 +30,12 @@ let MessagesService = class MessagesService {
     }
     async create(createMessageDto) {
         var _a, _b;
+        if (!createMessageDto.conversationId) {
+            throw new common_1.BadRequestException('Conversation ID is required');
+        }
+        const conversationId = createMessageDto.conversationId;
         const message = await this.logMessage({
-            conversationId: createMessageDto.conversationId,
+            conversationId,
             content: createMessageDto.content,
             senderId: createMessageDto.senderId,
             senderType: (_a = createMessageDto.senderType) !== null && _a !== void 0 ? _a : message_sender_enum_1.MessageSender.Tenant,
@@ -40,7 +44,7 @@ let MessagesService = class MessagesService {
         let reply = null;
         if (createMessageDto.replyContent) {
             reply = await this.logMessage({
-                conversationId: createMessageDto.conversationId,
+                conversationId,
                 content: createMessageDto.replyContent,
                 senderId: createMessageDto.replySenderId,
                 senderType: (_b = createMessageDto.replySenderType) !== null && _b !== void 0 ? _b : message_sender_enum_1.MessageSender.Assistant,

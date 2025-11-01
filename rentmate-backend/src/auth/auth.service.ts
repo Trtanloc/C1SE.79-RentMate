@@ -84,8 +84,4 @@ export class AuthService {
     // Stateless JWT logout stub; client should discard token.
     return { message: 'Logout successful' };
   }
-
-  async logout() {
-    return { message: 'Logout successful' };
-  }
 }

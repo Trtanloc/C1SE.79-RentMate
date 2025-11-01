@@ -8,12 +8,27 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcrypt");
 const users_service_1 = require("../users/users.service");
+const sanitizeUser = (user) => {
+    const { password } = user, rest = __rest(user, ["password"]);
+    return rest;
+};
 let AuthService = class AuthService {
     constructor(usersService, jwtService) {
         this.usersService = usersService;
@@ -26,8 +41,16 @@ let AuthService = class AuthService {
         }
         const hashedPassword = await bcrypt.hash(registerDto.password, 10);
         const user = await this.usersService.create(Object.assign(Object.assign({}, registerDto), { password: hashedPassword }));
-        const token = this.generateToken(user);
-        return { user, token };
+        const payload = {
+            sub: user.id,
+            email: user.email,
+            role: user.role,
+        };
+        const token = await this.jwtService.signAsync(payload);
+        return {
+            token,
+            user: sanitizeUser(user),
+        };
     }
     async validateUser(email, password) {
         const user = await this.usersService.findByEmail(email);
@@ -42,18 +65,19 @@ let AuthService = class AuthService {
     }
     async login(loginDto) {
         const user = await this.validateUser(loginDto.email, loginDto.password);
-        const token = this.generateToken(user);
-        return { user, token };
-    }
-    logout() {
-        return { success: true };
-    }
-    generateToken(user) {
-        return this.jwtService.sign({
+        const payload = {
             sub: user.id,
             email: user.email,
             role: user.role,
-        });
+        };
+        const token = await this.jwtService.signAsync(payload);
+        return {
+            token,
+            user: sanitizeUser(user),
+        };
+    }
+    async logout() {
+        return { message: 'Logout successful' };
     }
 };
 exports.AuthService = AuthService;

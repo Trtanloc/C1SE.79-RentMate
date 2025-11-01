@@ -26,11 +26,8 @@ let AuthController = class AuthController {
         const result = await this.authService.register(registerDto);
         return {
             success: true,
-            message: 'Registration successful',
-            data: {
-                user: result.user,
-                token: result.token,
-            },
+            message: 'User registered successfully',
+            data: result,
         };
     }
     async login(loginDto) {
@@ -38,18 +35,12 @@ let AuthController = class AuthController {
         return {
             success: true,
             message: 'Login successful',
-            data: {
-                user: result.user,
-                token: result.token,
-            },
+            data: result,
         };
     }
     async logout() {
-        await this.authService.logout();
-        return {
-            success: true,
-            message: 'Logout successful',
-        };
+        const result = await this.authService.logout();
+        return { success: true, message: result.message, data: null };
     }
 };
 exports.AuthController = AuthController;

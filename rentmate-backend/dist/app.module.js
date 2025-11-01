@@ -15,6 +15,11 @@ const auth_module_1 = require("./auth/auth.module");
 const properties_module_1 = require("./properties/properties.module");
 const user_entity_1 = require("./users/entities/user.entity");
 const property_entity_1 = require("./properties/entities/property.entity");
+const contract_entity_1 = require("./contracts/entities/contract.entity");
+const transaction_entity_1 = require("./transactions/entities/transaction.entity");
+const message_entity_1 = require("./messages/entities/message.entity");
+const messages_module_1 = require("./messages/messages.module");
+const ai_module_1 = require("./ai/ai.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,7 +40,7 @@ exports.AppModule = AppModule = __decorate([
                     username: configService.get('DB_USER', 'root'),
                     password: configService.get('DB_PASS', '123456'),
                     database: configService.get('DB_NAME', 'rentmate'),
-                    entities: [user_entity_1.User, property_entity_1.Property],
+                    entities: [user_entity_1.User, property_entity_1.Property, contract_entity_1.Contract, transaction_entity_1.Transaction, message_entity_1.Message],
                     synchronize: configService.get('DB_SYNCHRONIZE', 'true') === 'true',
                     logging: configService.get('DB_LOGGING', 'false') === 'true',
                 }),
@@ -43,6 +48,8 @@ exports.AppModule = AppModule = __decorate([
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
             properties_module_1.PropertiesModule,
+            messages_module_1.MessagesModule,
+            ai_module_1.AiModule,
         ],
     })
 ], AppModule);

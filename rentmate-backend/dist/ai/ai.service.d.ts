@@ -5,7 +5,10 @@ import { Contract } from '../contracts/entities/contract.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { MessagesService } from '../messages/messages.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { User } from '../users/entities/user.entity';
+type TenantContext = {
+    id: number;
+    fullName?: string | null;
+};
 export declare class AiService {
     private readonly configService;
     private readonly propertyRepository;
@@ -16,9 +19,9 @@ export declare class AiService {
     private readonly geminiBaseUrl;
     private readonly geminiModel;
     constructor(configService: ConfigService, propertyRepository: Repository<Property>, contractRepository: Repository<Contract>, transactionRepository: Repository<Transaction>, messagesService: MessagesService);
-    handleChat(user: User, chatRequestDto: ChatRequestDto): Promise<{
+    handleChat(user: TenantContext, chatRequestDto: ChatRequestDto): Promise<{
         conversationId: string;
-        reply: any;
+        reply: string;
         source: string;
         context: string;
     }>;
@@ -34,3 +37,4 @@ export declare class AiService {
     private extractOwnerName;
     private formatCurrency;
 }
+export {};

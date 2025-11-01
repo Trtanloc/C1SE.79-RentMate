@@ -1,5 +1,6 @@
 import { Property } from '../../properties/entities/property.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { Contract } from '../../contracts/entities/contract.entity';
 export declare class User {
     id: number;
     fullName: string;
@@ -11,4 +12,6 @@ export declare class User {
     createdAt: Date;
     updatedAt: Date;
     properties: Property[];
+    contractsAsTenant: Contract[];
+    contractsAsOwner: Contract[];
 }

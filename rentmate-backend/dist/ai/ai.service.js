@@ -70,7 +70,7 @@ let AiService = AiService_1 = class AiService {
         return `tenant-${senderId}`;
     }
     buildPrompt(message, tenantName, context) {
-        const persona = 'Bạn là "RentMate Virtual Assistant – giúp người thuê nhà tra cứu, hỏi thông tin hợp đồng, và gợi ý bất động sản phù hợp." Giọng điệu thân thiện, súc tích, ưu tiên tiếng Việt và chỉ chuyển sang tiếng Anh nếu người dùng hỏi bằng tiếng Anh.';
+        const persona = 'Bạn là "RentMate Virtual Assistant" – giúp người thuê nhà tra cứu thông tin, hỏi về hợp đồng, thanh toán và gợi ý bất động sản phù hợp. Giữ giọng điệu thân thiện, súc tích, ưu tiên tiếng Việt và chỉ chuyển sang tiếng Anh khi người dùng hỏi bằng tiếng Anh.';
         const contextBlock = context
             ? `Dữ liệu nội bộ cần ưu tiên trả lời:\n${context}`
             : 'Không có dữ liệu nội bộ phù hợp, hãy dựa vào kiến thức chung của bạn.';
@@ -88,7 +88,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
         const apiKey = this.configService.get('GEMINI_API_KEY');
         if (!apiKey) {
             this.logger.error('Missing GEMINI_API_KEY – returning fallback answer.');
-            return 'RentMate chưa được cấu hình khoá Gemini. Vui lòng liên hệ quản trị viên.';
+            return 'RentMate chưa được cấu hình khóa Gemini. Vui lòng liên hệ quản trị viên.';
         }
         try {
             const endpoint = `${this.geminiBaseUrl}/${this.geminiModel}:generateContent`;
@@ -146,20 +146,26 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
         const query = this.propertyRepository
             .createQueryBuilder('property')
             .leftJoinAndSelect('property.owner', 'owner')
-            .where('property.status = :status', { status: property_status_enum_1.PropertyStatus.Available });
+            .where('property.status = :status', {
+            status: property_status_enum_1.PropertyStatus.Available,
+        });
         if (maxBudget) {
             query.andWhere('property.price <= :maxBudget', { maxBudget });
         }
         if (city) {
             query.andWhere('(property.address LIKE :city OR property.title LIKE :city)', { city: `%${city}%` });
         }
-        const properties = await query.orderBy('property.price', 'ASC').limit(3).getMany();
+        const properties = await query
+            .orderBy('property.price', 'ASC')
+            .limit(3)
+            .getMany();
         if (!properties.length) {
             return `Không có bất động sản phù hợp với điều kiện ${city ? `tại ${city}` : ''} ${maxBudget ? `và ngân sách ${this.formatCurrency(maxBudget)}` : ''}.`;
         }
         const lines = properties.map((property) => {
             var _a, _b;
-            return `• ${property.title} (${property.address}) – ${this.formatCurrency(Number(property.price))}/tháng, chủ nhà: ${(_b = (_a = property.owner) === null || _a === void 0 ? void 0 : _a.fullName) !== null && _b !== void 0 ? _b : 'Chưa cập nhật'}`;
+            const ownerName = (_b = (_a = property.owner) === null || _a === void 0 ? void 0 : _a.fullName) !== null && _b !== void 0 ? _b : 'Chưa cập nhật';
+            return `• ${property.title} (${property.address}) – ${this.formatCurrency(Number(property.price))}/tháng, chủ nhà: ${ownerName}`;
         });
         return `Gợi ý bất động sản từ cơ sở dữ liệu:\n${lines.join('\n')}`;
     }
@@ -177,7 +183,9 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
             .where('contract.tenantId = :tenantId', { tenantId })
             .orderBy('contract.updatedAt', 'DESC');
         if (ownerName) {
-            query.andWhere('owner.fullName LIKE :ownerName', { ownerName: `%${ownerName}%` });
+            query.andWhere('owner.fullName LIKE :ownerName', {
+                ownerName: `%${ownerName}%`,
+            });
         }
         const contract = await query.getOne();
         if (!contract) {
