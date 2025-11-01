@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Property } from '../../properties/entities/property.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { Contract } from '../../contracts/entities/contract.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -46,4 +47,10 @@ export class User {
 
   @OneToMany(() => Property, (property) => property.owner)
   properties: Property[];
+
+  @OneToMany(() => Contract, (contract) => contract.tenant)
+  contractsAsTenant: Contract[];
+
+  @OneToMany(() => Contract, (contract) => contract.owner)
+  contractsAsOwner: Contract[];
 }

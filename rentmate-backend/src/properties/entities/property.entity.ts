@@ -4,11 +4,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { PropertyStatus } from '../../common/enums/property-status.enum';
+import { Contract } from '../../contracts/entities/contract.entity';
 
 @Entity({ name: 'properties' })
 export class Property {
@@ -51,4 +53,7 @@ export class Property {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Contract, (contract) => contract.property)
+  contracts: Contract[];
 }

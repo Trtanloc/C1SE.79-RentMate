@@ -17,6 +17,7 @@
   "author": "C1SE.79 Team",
   "license": "MIT",
   "dependencies": {
+    "axios": "^1.7.7",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",

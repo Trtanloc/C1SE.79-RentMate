@@ -6,6 +6,11 @@ import { AuthModule } from './auth/auth.module';
 import { PropertiesModule } from './properties/properties.module';
 import { User } from './users/entities/user.entity';
 import { Property } from './properties/entities/property.entity';
+import { Contract } from './contracts/entities/contract.entity';
+import { Transaction } from './transactions/entities/transaction.entity';
+import { Message } from './messages/entities/message.entity';
+import { MessagesModule } from './messages/messages.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -23,7 +28,7 @@ import { Property } from './properties/entities/property.entity';
         username: configService.get<string>('DB_USER', 'root'),
         password: configService.get<string>('DB_PASS', '123456'),
         database: configService.get<string>('DB_NAME', 'rentmate'),
-        entities: [User, Property],
+        entities: [User, Property, Contract, Transaction, Message],
         synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
         logging: configService.get<string>('DB_LOGGING', 'false') === 'true',
       }),
@@ -31,6 +36,8 @@ import { Property } from './properties/entities/property.entity';
     UsersModule,
     AuthModule,
     PropertiesModule,
+    MessagesModule,
+    AiModule,
   ],
 })
 export class AppModule {}
