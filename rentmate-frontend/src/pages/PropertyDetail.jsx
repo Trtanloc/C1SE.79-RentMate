@@ -51,6 +51,30 @@ const PropertyDetail = () => {
     return null;
   }
 
+  const amenities = Array.isArray(property.amenities)
+    ? property.amenities.filter(Boolean)
+    : typeof property.amenities === 'string'
+      ? property.amenities
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+
+  const images = Array.isArray(property.images)
+    ? property.images.filter(Boolean)
+    : typeof property.images === 'string'
+      ? property.images
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+
+  const formattedPrice =
+    property.price !== undefined && property.price !== null
+      ? Number(property.price).toLocaleString()
+      : null;
+  const heroImage = images[0];
+
   return (
     <section className="mx-auto max-w-4xl px-4 py-10">
       <button
@@ -61,11 +85,21 @@ const PropertyDetail = () => {
         Back to list
       </button>
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <div className="h-64 bg-gradient-to-br from-primary/20 via-primary/10 to-success/20">
+        <div
+          className={`h-64 ${heroImage ? 'bg-cover bg-center' : 'bg-gradient-to-br from-primary/20 via-primary/10 to-success/20'}`}
+          style={heroImage ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42)), url(${heroImage})` } : undefined}
+        >
           <div className="flex h-full flex-col items-start justify-end gap-3 p-6 text-white">
-            <span className="rounded-full bg-primary/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-              {statusLabels[property.status] || property.status}
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-primary/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                {statusLabels[property.status] || property.status}
+              </span>
+              {formattedPrice && (
+                <span className="rounded-full bg-black/30 px-3 py-1 text-xs font-semibold">
+                  ${formattedPrice} / month
+                </span>
+              )}
+            </div>
             <h1 className="text-3xl font-semibold">{property.title}</h1>
             <p className="text-sm opacity-90">{property.address}</p>
           </div>
@@ -74,14 +108,55 @@ const PropertyDetail = () => {
           <article className="space-y-4 text-sm text-gray-600">
             <h2 className="text-xl font-semibold text-gray-800">Description</h2>
             <p>{property.description}</p>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-gray-800">Photo gallery</h2>
+              {images.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {images.map((src) => (
+                    <figure
+                      key={src}
+                      className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100"
+                    >
+                      <img
+                        src={src}
+                        alt={`${property.title} preview`}
+                        className="h-40 w-full object-cover transition duration-200 hover:scale-105"
+                      />
+                    </figure>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Images are not available for this property yet.
+                </p>
+              )}
+            </div>
             <div className="rounded-2xl bg-gray-50 p-4">
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Key details</h3>
               <ul className="grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
+                <li>Address: {property.address}</li>
                 <li>Area: {property.area} m2</li>
                 <li>Price: ${Number(property.price).toLocaleString()}</li>
                 <li>Status: {statusLabels[property.status] || property.status}</li>
                 {property.owner && <li>Owner: {property.owner.fullName}</li>}
               </ul>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-gray-800">Amenities</h2>
+              {amenities.length > 0 ? (
+                <ul className="flex flex-wrap gap-2">
+                  {amenities.map((amenity) => (
+                    <li
+                      key={amenity}
+                      className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                    >
+                      {amenity}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500">No amenities provided for this listing.</p>
+              )}
             </div>
           </article>
           <aside className="space-y-4 rounded-2xl border border-gray-200 p-4">

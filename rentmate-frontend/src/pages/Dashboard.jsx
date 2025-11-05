@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
 
   const canManageProperties = useMemo(
     () => user.role === UserRole.Landlord || user.role === UserRole.Admin,
@@ -56,12 +57,55 @@ const Dashboard = () => {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    setFormErrors((prev) => {
+      if (!prev[name]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const fieldClass = (field) =>
+    `w-full rounded-xl border px-4 py-2 text-sm outline-none transition focus:ring-2 ${
+      formErrors[field]
+        ? 'border-danger focus:border-danger focus:ring-danger/30'
+        : 'border-gray-200 focus:border-primary focus:ring-primary/30'
+    }`;
+
+  const validatePropertyForm = (values) => {
+    const nextErrors = {};
+    if (!values.title.trim()) {
+      nextErrors.title = 'Title is required';
+    }
+    if (!values.address.trim()) {
+      nextErrors.address = 'Address is required';
+    }
+    const priceValue = Number(values.price);
+    if (values.price === '' || Number.isNaN(priceValue) || priceValue <= 0) {
+      nextErrors.price = 'Enter a valid positive price';
+    }
+    const areaValue = Number(values.area);
+    if (values.area === '' || Number.isNaN(areaValue) || areaValue <= 0) {
+      nextErrors.area = 'Enter a valid positive area';
+    }
+    if (!values.description.trim()) {
+      nextErrors.description = 'Description is required';
+    }
+    return nextErrors;
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    const validationErrors = validatePropertyForm(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      return;
+    }
+    setFormErrors({});
     try {
       const payload = {
         ...form,
@@ -139,8 +183,9 @@ const Dashboard = () => {
                 onChange={handleChange}
                 placeholder="Modern apartment"
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                className={fieldClass('title')}
               />
+              {formErrors.title && <p className="mt-1 text-xs text-danger">{formErrors.title}</p>}
             </div>
             <div>
               <label htmlFor="address" className="mb-1 block text-sm font-medium text-gray-700">
@@ -153,8 +198,11 @@ const Dashboard = () => {
                 onChange={handleChange}
                 placeholder="123 Main Street, City"
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                className={fieldClass('address')}
               />
+              {formErrors.address && (
+                <p className="mt-1 text-xs text-danger">{formErrors.address}</p>
+              )}
             </div>
             <div>
               <label htmlFor="price" className="mb-1 block text-sm font-medium text-gray-700">
@@ -170,8 +218,9 @@ const Dashboard = () => {
                 onChange={handleChange}
                 placeholder="1500"
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                className={fieldClass('price')}
               />
+              {formErrors.price && <p className="mt-1 text-xs text-danger">{formErrors.price}</p>}
             </div>
             <div>
               <label htmlFor="area" className="mb-1 block text-sm font-medium text-gray-700">
@@ -186,8 +235,9 @@ const Dashboard = () => {
                 onChange={handleChange}
                 placeholder="80"
                 required
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                className={fieldClass('area')}
               />
+              {formErrors.area && <p className="mt-1 text-xs text-danger">{formErrors.area}</p>}
             </div>
             <div>
               <label htmlFor="status" className="mb-1 block text-sm font-medium text-gray-700">
@@ -198,7 +248,7 @@ const Dashboard = () => {
                 name="status"
                 value={form.status}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                className={fieldClass('status')}
               >
                 {Object.values(PropertyStatus).map((value) => (
                   <option key={value} value={value}>
@@ -218,8 +268,11 @@ const Dashboard = () => {
                 onChange={handleChange}
                 placeholder="Highlight property features and nearby amenities"
                 rows={4}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                className={fieldClass('description')}
               />
+              {formErrors.description && (
+                <p className="mt-1 text-xs text-danger">{formErrors.description}</p>
+              )}
             </div>
             {success && <p className="text-sm text-success">{success}</p>}
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -232,7 +285,12 @@ const Dashboard = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setForm(emptyForm)}
+                onClick={() => {
+                  setForm(emptyForm);
+                  setFormErrors({});
+                  setError(null);
+                  setSuccess(null);
+                }}
                 className="flex-1 rounded-xl bg-secondary px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
               >
                 Reset
