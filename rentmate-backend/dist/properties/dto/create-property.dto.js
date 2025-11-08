@@ -17,15 +17,18 @@ class CreatePropertyDto {
 exports.CreatePropertyDto = CreatePropertyDto;
 __decorate([
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.MaxLength)(200),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "title", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "description", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "address", void 0);
 __decorate([

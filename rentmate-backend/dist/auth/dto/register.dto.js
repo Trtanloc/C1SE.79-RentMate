@@ -17,7 +17,12 @@ class RegisterDto {
 exports.RegisterDto = RegisterDto;
 __decorate([
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.MaxLength)(100),
+    (0, class_validator_1.Matches)(/^[A-Za-z\s]+$/, {
+        message: 'Full name must contain only alphabetic characters and spaces',
+    }),
+    (0, class_validator_1.MinLength)(2),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "fullName", void 0);
 __decorate([
@@ -27,14 +32,21 @@ __decorate([
 ], RegisterDto.prototype, "email", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.MinLength)(8),
     (0, class_validator_1.MaxLength)(50),
+    (0, class_validator_1.Matches)(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).+$/, {
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, and one special character',
+    }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.MaxLength)(20),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^[+\d\s()-]{7,20}$/, {
+        message: 'Phone must be a valid phone number',
+    }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "phone", void 0);
 __decorate([
