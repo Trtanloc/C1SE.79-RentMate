@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import axiosClient from './axiosClient';
 
 /**
@@ -287,3 +288,6 @@ export const aiChatAPI = {
     }
   }
 };
+=======
+
+>>>>>>> 9ee13208a7fb1408f1a9c8aa774b2e5dc0b05e5b
