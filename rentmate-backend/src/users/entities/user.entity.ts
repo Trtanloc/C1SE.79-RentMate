@@ -10,6 +10,7 @@ import {
 import { Property } from '../../properties/entities/property.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Contract } from '../../contracts/entities/contract.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -53,4 +54,7 @@ export class User {
 
   @OneToMany(() => Contract, (contract) => contract.owner)
   contractsAsOwner: Contract[];
+
+  @OneToMany(() => Notification, (notification) => notification.user)
+  notifications: Notification[];
 }
