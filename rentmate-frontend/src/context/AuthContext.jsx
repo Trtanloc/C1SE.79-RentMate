@@ -11,8 +11,14 @@ import axiosClient from '../api/axiosClient';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+// Code này để gggiups khi phảu đăng nhập là người cho thuê nó mới hiện dashboard(test dashboard thì đặt role là landlord,  )
+//const [user, setUser] = useState(null);
+//const [token, setToken] = useState(null);
+  const [user, setUser] = useState({ 
+  fullName: 'phát', 
+  role: 'landlord'          
+});
+const [token, setToken] = useState('fake-test-token');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('rentmate_user');
