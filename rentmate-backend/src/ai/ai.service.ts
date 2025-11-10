@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Property } from '../properties/entities/property.entity';
 import { Contract } from '../contracts/entities/contract.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
@@ -27,6 +27,23 @@ type TenantContext = {
   fullName?: string | null;
 };
 
+type RecommendationFilters = {
+  normalized: string;
+  mentionsProperty: boolean;
+  mentionsPrice: boolean;
+  maxBudget?: number;
+  city?: string;
+  shouldSearch: boolean;
+};
+
+type BudgetCluster = 'budget' | 'balanced' | 'premium';
+
+type RankedProperty = {
+  property: Property;
+  score: number;
+  cluster: BudgetCluster;
+};
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -35,6 +52,8 @@ export class AiService {
 
   constructor(
     private readonly configService: ConfigService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
     @InjectRepository(Contract)
@@ -48,9 +67,21 @@ export class AiService {
       this.configService.get<string>('GEMINI_MODEL') ?? defaultModel;
   }
 
+  private async ensureDatabaseConnection(options?: { skipLog?: boolean }) {
+    if (!this.dataSource.isInitialized) {
+      await this.dataSource.initialize();
+    }
+
+    if (!options?.skipLog) {
+      this.logger.log('✅ Connected to DB');
+    }
+  }
+
   async handleChat(user: TenantContext, chatRequestDto: ChatRequestDto) {
     const trimmedMessage = chatRequestDto.message.trim();
     const conversationId = this.buildConversationId(user.id);
+
+     await this.ensureDatabaseConnection();
 
     await this.messagesService.logMessage({
       conversationId,
@@ -69,6 +100,7 @@ export class AiService {
       user.fullName,
       contextResult?.context,
     );
+    this.logger.log('✅ Sending data to Gemini API');
     const reply = await this.requestGemini(prompt);
 
     await this.messagesService.logMessage({
@@ -194,20 +226,78 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
   private async gatherPropertyRecommendations(
     message: string,
   ): Promise<string | null> {
-    const normalized = message.toLowerCase();
-    const mentionsProperty =
-      /(căn hộ|chung cư|apartment|nhà thuê|thuê nhà|property|bất động sản)/.test(
-        normalized,
-      );
-    const mentionsPrice =
-      /(giá|price|bao nhiêu|dưới|tầm|khoảng|budget)/.test(normalized);
-    const maxBudget = this.extractBudget(message);
-    const city = this.extractCity(message);
-
-    if (!mentionsProperty && !mentionsPrice && !maxBudget && !city) {
+    const filters = this.parseRecommendationFilters(message);
+    if (!filters.shouldSearch) {
       return null;
     }
 
+    await this.ensureDatabaseConnection({ skipLog: true });
+
+    try {
+      const properties = await this.fetchCandidateProperties(filters);
+      this.logger.log(`? Retrieved ${properties.length} properties`);
+
+      if (!properties.length) {
+        return `Kh?ng c? b?t ??ng s?n ph? h?p${
+          filters.city ? ` t?i ${filters.city}` : ''
+        }${
+          filters.maxBudget
+            ? ` v?i ng?n s?ch ${this.formatCurrency(filters.maxBudget)}`
+            : ''
+        }.`;
+      }
+
+      const ranked = this
+        .rankPropertiesWithMcdm(properties, filters)
+        .slice(0, 3);
+      const clusterSummary = this.describeClusterSummary(ranked);
+
+      const lines = ranked.map((item, index) => {
+        const ownerName = item.property.owner?.fullName ?? 'Ch?a c?p nh?t';
+        return `${index + 1}. ${item.property.title} (${item.property.address}) ? ${this.formatCurrency(
+          Number(item.property.price),
+        )}/th?ng, di?n t?ch ${item.property.area}m2, ch? nh?: ${ownerName}, ?i?m MCDM: ${item.score}`;
+      });
+
+      return [
+        'G?i ? b?t ??ng s?n t? c? s? d? li?u + MCDM:',
+        ...lines,
+        clusterSummary,
+      ].join('\n');
+    } catch (error) {
+      this.logger.error('Failed to gather property recommendations', error);
+      return 'Ch?ng t?i t?m th?i kh?ng truy v?n ???c d? li?u b?t ??ng s?n. Vui l?ng th? l?i sau.';
+    }
+  }
+
+  private parseRecommendationFilters(message: string): RecommendationFilters {
+    const normalized = message.toLowerCase();
+    const mentionsProperty =
+      /(c?n h?|chung c?|apartment|nh? thu?|thu? nh?|property|b?t ??ng s?n)/.test(
+        normalized,
+      );
+    const mentionsPrice =
+      /(gi?|price|bao nhi?u|d??i|t?m|kho?ng|budget)/.test(normalized);
+    const maxBudget = this.extractBudget(message);
+    const city = this.extractCity(message);
+
+    return {
+      normalized,
+      mentionsProperty,
+      mentionsPrice,
+      maxBudget,
+      city,
+      shouldSearch:
+        mentionsProperty ||
+        mentionsPrice ||
+        typeof maxBudget === 'number' ||
+        Boolean(city),
+    };
+  }
+
+  private async fetchCandidateProperties(
+    filters: RecommendationFilters,
+  ): Promise<Property[]> {
     const query = this.propertyRepository
       .createQueryBuilder('property')
       .leftJoinAndSelect('property.owner', 'owner')
@@ -215,36 +305,127 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
         status: PropertyStatus.Available,
       });
 
-    if (maxBudget) {
-      query.andWhere('property.price <= :maxBudget', { maxBudget });
+    if (filters.maxBudget) {
+      query.andWhere('property.price <= :maxBudget', {
+        maxBudget: filters.maxBudget,
+      });
     }
 
-    if (city) {
+    if (filters.city) {
       query.andWhere(
         '(property.address LIKE :city OR property.title LIKE :city)',
-        { city: `%${city}%` },
+        { city: `%${filters.city}%` },
       );
     }
 
-    const properties = await query
-      .orderBy('property.price', 'ASC')
-      .limit(3)
-      .getMany();
-
-    if (!properties.length) {
-      return `Không có bất động sản phù hợp với điều kiện ${city ? `tại ${city}` : ''} ${
-        maxBudget ? `và ngân sách ${this.formatCurrency(maxBudget)}` : ''
-      }.`;
-    }
-
-    const lines = properties.map((property) => {
-      const ownerName = property.owner?.fullName ?? 'Chưa cập nhật';
-      return `• ${property.title} (${property.address}) – ${this.formatCurrency(Number(property.price))}/tháng, chủ nhà: ${ownerName}`;
-    });
-
-    return `Gợi ý bất động sản từ cơ sở dữ liệu:\n${lines.join('\n')}`;
+    return query.orderBy('property.price', 'ASC').limit(10).getMany();
   }
 
+  private rankPropertiesWithMcdm(
+    properties: Property[],
+    filters: RecommendationFilters,
+  ): RankedProperty[] {
+    if (!properties.length) {
+      return [];
+    }
+
+    const priceValues = properties.map((item) => Number(item.price));
+    const areaValues = properties.map((item) => Number(item.area));
+    const minPrice = Math.min(...priceValues);
+    const maxPrice = Math.max(...priceValues);
+    const minArea = Math.min(...areaValues);
+    const maxArea = Math.max(...areaValues);
+    const avgPrice =
+      priceValues.reduce((sum, value) => sum + value, 0) / priceValues.length;
+
+    return properties
+      .map((property) => {
+        const price = Number(property.price);
+        const normalizedPrice =
+          maxPrice === minPrice
+            ? 1
+            : 1 - (price - minPrice) / (maxPrice - minPrice);
+        const normalizedArea =
+          maxArea === minArea
+            ? 1
+            : (Number(property.area) - minArea) / (maxArea - minArea);
+        const locationAffinity = filters.city
+          ? this.computeLocationAffinity(property, filters.city)
+          : 0.5;
+
+        const weights = filters.maxBudget
+          ? { price: 0.5, area: 0.3, location: 0.2 }
+          : { price: 0.4, area: 0.4, location: 0.2 };
+
+        const score =
+          normalizedPrice * weights.price +
+          normalizedArea * weights.area +
+          locationAffinity * weights.location;
+
+        return {
+          property,
+          score: Number(score.toFixed(4)),
+          cluster: this.assignCluster(price, {
+            budget: filters.maxBudget,
+            average: avgPrice,
+          }),
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+  }
+
+  private computeLocationAffinity(property: Property, city: string): number {
+    const haystack = `${property.title} ${property.address}`.toLowerCase();
+    return haystack.includes(city.toLowerCase()) ? 1 : 0.3;
+  }
+
+  private assignCluster(
+    price: number,
+    stats: { budget?: number; average: number },
+  ): BudgetCluster {
+    const reference = stats.budget ?? stats.average;
+    if (!reference) {
+      return price <= stats.average ? 'balanced' : 'premium';
+    }
+
+    if (price <= reference * 0.8) {
+      return 'budget';
+    }
+
+    if (price <= reference * 1.05) {
+      return 'balanced';
+    }
+
+    return 'premium';
+  }
+
+  private describeClusterSummary(ranked: RankedProperty[]): string {
+    if (!ranked.length) {
+      return 'Kh?ng c? d? li?u ph?n c?m.';
+    }
+
+    const counts: Record<BudgetCluster, number> = {
+      budget: 0,
+      balanced: 0,
+      premium: 0,
+    };
+
+    ranked.forEach((item) => {
+      counts[item.cluster] += 1;
+    });
+
+    const labels: Record<BudgetCluster, string> = {
+      budget: 'ti?t ki?m',
+      balanced: 'c?n b?ng',
+      premium: 'cao c?p',
+    };
+
+    const summary = (Object.keys(labels) as BudgetCluster[])
+      .map((cluster) => `${labels[cluster]}: ${counts[cluster]}`)
+      .join(' ? ');
+
+    return `Ph?n c?m ng?n s?ch (MCDM): ${summary}`;
+  }
   private async lookupLatestContractStatus(
     message: string,
     tenantId: number,
