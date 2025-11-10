@@ -5,6 +5,7 @@ import PropertyDetail from './pages/PropertyDetail.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import NotificationsPage from './pages/NotificationsPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ChatBox from './components/ChatBox.jsx';
 
@@ -27,11 +28,19 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  </main>
-  <ChatBox />
-</div>
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+      <ChatBox />
+    </div>
   );
 };
 

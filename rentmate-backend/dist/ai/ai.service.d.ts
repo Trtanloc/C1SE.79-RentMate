@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Property } from '../properties/entities/property.entity';
 import { Contract } from '../contracts/entities/contract.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
@@ -11,6 +11,7 @@ type TenantContext = {
 };
 export declare class AiService {
     private readonly configService;
+    private readonly dataSource;
     private readonly propertyRepository;
     private readonly contractRepository;
     private readonly transactionRepository;
@@ -18,7 +19,8 @@ export declare class AiService {
     private readonly logger;
     private readonly geminiBaseUrl;
     private readonly geminiModel;
-    constructor(configService: ConfigService, propertyRepository: Repository<Property>, contractRepository: Repository<Contract>, transactionRepository: Repository<Transaction>, messagesService: MessagesService);
+    constructor(configService: ConfigService, dataSource: DataSource, propertyRepository: Repository<Property>, contractRepository: Repository<Contract>, transactionRepository: Repository<Transaction>, messagesService: MessagesService);
+    private ensureDatabaseConnection;
     handleChat(user: TenantContext, chatRequestDto: ChatRequestDto): Promise<{
         conversationId: string;
         reply: string;
@@ -30,6 +32,12 @@ export declare class AiService {
     private requestGemini;
     private buildDatabaseContext;
     private gatherPropertyRecommendations;
+    private parseRecommendationFilters;
+    private fetchCandidateProperties;
+    private rankPropertiesWithMcdm;
+    private computeLocationAffinity;
+    private assignCluster;
+    private describeClusterSummary;
     private lookupLatestContractStatus;
     private lookupLatestTransaction;
     private extractBudget;

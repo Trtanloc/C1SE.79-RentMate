@@ -20,6 +20,8 @@ const transaction_entity_1 = require("./transactions/entities/transaction.entity
 const message_entity_1 = require("./messages/entities/message.entity");
 const messages_module_1 = require("./messages/messages.module");
 const ai_module_1 = require("./ai/ai.module");
+const notification_entity_1 = require("./notifications/entities/notification.entity");
+const notifications_module_1 = require("./notifications/notifications.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -40,7 +42,7 @@ exports.AppModule = AppModule = __decorate([
                     username: configService.get('DB_USER', 'root'),
                     password: configService.get('DB_PASS', '123456'),
                     database: configService.get('DB_NAME', 'rentmate'),
-                    entities: [user_entity_1.User, property_entity_1.Property, contract_entity_1.Contract, transaction_entity_1.Transaction, message_entity_1.Message],
+                    entities: [user_entity_1.User, property_entity_1.Property, contract_entity_1.Contract, transaction_entity_1.Transaction, message_entity_1.Message, notification_entity_1.Notification],
                     synchronize: configService.get('DB_SYNCHRONIZE', 'true') === 'true',
                     logging: configService.get('DB_LOGGING', 'false') === 'true',
                 }),
@@ -50,6 +52,7 @@ exports.AppModule = AppModule = __decorate([
             properties_module_1.PropertiesModule,
             messages_module_1.MessagesModule,
             ai_module_1.AiModule,
+            notifications_module_1.NotificationsModule,
         ],
     })
 ], AppModule);

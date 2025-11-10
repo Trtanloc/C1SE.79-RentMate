@@ -15,6 +15,7 @@ const typeorm_1 = require("typeorm");
 const property_entity_1 = require("../../properties/entities/property.entity");
 const user_role_enum_1 = require("../../common/enums/user-role.enum");
 const contract_entity_1 = require("../../contracts/entities/contract.entity");
+const notification_entity_1 = require("../../notifications/entities/notification.entity");
 let User = class User {
 };
 exports.User = User;
@@ -71,6 +72,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => contract_entity_1.Contract, (contract) => contract.owner),
     __metadata("design:type", Array)
 ], User.prototype, "contractsAsOwner", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => notification_entity_1.Notification, (notification) => notification.user),
+    __metadata("design:type", Array)
+], User.prototype, "notifications", void 0);
 exports.User = User = __decorate([
     (0, typeorm_1.Entity)({ name: 'users' })
 ], User);

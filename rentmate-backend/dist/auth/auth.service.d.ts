@@ -20,6 +20,7 @@ export declare class AuthService {
             properties: import("../properties/entities/property.entity").Property[];
             contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
             contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
+            notifications: import("../notifications/entities/notification.entity").Notification[];
         };
     }>;
     private validateUser;
@@ -37,6 +38,7 @@ export declare class AuthService {
             properties: import("../properties/entities/property.entity").Property[];
             contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
             contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
+            notifications: import("../notifications/entities/notification.entity").Notification[];
         };
     }>;
     logout(): Promise<{

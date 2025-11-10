@@ -11,6 +11,8 @@ import { Transaction } from './transactions/entities/transaction.entity';
 import { Message } from './messages/entities/message.entity';
 import { MessagesModule } from './messages/messages.module';
 import { AiModule } from './ai/ai.module';
+import { Notification } from './notifications/entities/notification.entity';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -28,7 +30,7 @@ import { AiModule } from './ai/ai.module';
         username: configService.get<string>('DB_USER', 'root'),
         password: configService.get<string>('DB_PASS', '123456'),
         database: configService.get<string>('DB_NAME', 'rentmate'),
-        entities: [User, Property, Contract, Transaction, Message],
+        entities: [User, Property, Contract, Transaction, Message, Notification],
         synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
         logging: configService.get<string>('DB_LOGGING', 'false') === 'true',
       }),
@@ -38,6 +40,7 @@ import { AiModule } from './ai/ai.module';
     PropertiesModule,
     MessagesModule,
     AiModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -21,6 +21,7 @@ export declare class AuthController {
                 properties: import("../properties/entities/property.entity").Property[];
                 contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
                 contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
+                notifications: import("../notifications/entities/notification.entity").Notification[];
             };
         };
     }>;
@@ -41,6 +42,7 @@ export declare class AuthController {
                 properties: import("../properties/entities/property.entity").Property[];
                 contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
                 contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
+                notifications: import("../notifications/entities/notification.entity").Notification[];
             };
         };
     }>;
