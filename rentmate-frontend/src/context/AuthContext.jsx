@@ -6,32 +6,20 @@ import {
   useState,
   useCallback,
 } from 'react';
-import axiosClient from '../api/axiosClient';
+import axiosClient from '../api/axiosClient.js';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-// Code này để gggiups khi phảu đăng nhập là người cho thuê nó mới hiện dashboard(test dashboard thì đặt role là landlord,  )
-//const [user, setUser] = useState(null);
-//const [token, setToken] = useState(null);
-  const [user, setUser] = useState({ 
-  fullName: 'phát', 
-  role: 'landlord'          
-});
-const [token, setToken] = useState('fake-test-token');
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('rentmate_user');
     const storedToken = localStorage.getItem('rentmate_token');
     if (storedUser && storedToken) {
-      try {
-        setUser(JSON.parse(storedUser));
-        setToken(storedToken);
-      } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('rentmate_user');
-        localStorage.removeItem('rentmate_token');
-      }
+      setUser(JSON.parse(storedUser));
+      setToken(storedToken);
     }
   }, []);
 
@@ -42,12 +30,25 @@ const [token, setToken] = useState('fake-test-token');
     setToken(nextToken);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    if (!token || !user?.id) {
+      return;
+    }
+    try {
+      const { data } = await axiosClient.get(`/users/${user.id}`);
+      const updatedUser = data.data;
+      setUser(updatedUser);
+      localStorage.setItem('rentmate_user', JSON.stringify(updatedUser));
+    } catch {
+      // ignore refresh errors
+    }
+  }, [token, user?.id]);
+
   const logout = useCallback(async () => {
     try {
       await axiosClient.post('/auth/logout');
     } catch (error) {
       // logout endpoint is a stub; ignore errors
-      console.log('Logout API call failed, continuing with local logout');
     } finally {
       localStorage.removeItem('rentmate_user');
       localStorage.removeItem('rentmate_token');
@@ -63,8 +64,9 @@ const [token, setToken] = useState('fake-test-token');
       isAuthenticated: Boolean(user && token),
       login,
       logout,
+      refreshUser,
     }),
-    [user, token, login, logout],
+    [user, token, login, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
