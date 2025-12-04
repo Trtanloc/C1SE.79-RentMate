@@ -1,13 +1,12 @@
 import {
   IsEmail,
-  IsEnum,
   IsString,
   IsNotEmpty,
   Matches,
   MaxLength,
   MinLength,
+  IsUUID,
 } from 'class-validator';
-import { UserRole } from '../../common/enums/user-role.enum';
 
 export class RegisterDto {
   @IsString()
@@ -19,7 +18,7 @@ export class RegisterDto {
   @MinLength(2)
   fullName: string;
 
-  @IsEmail()
+  @IsEmail({ require_tld: false })
   @MaxLength(100)
   email: string;
 
@@ -41,6 +40,6 @@ export class RegisterDto {
   })
   phone: string;
 
-  @IsEnum(UserRole)
-  role: UserRole;
+  @IsUUID()
+  verificationId: string;
 }

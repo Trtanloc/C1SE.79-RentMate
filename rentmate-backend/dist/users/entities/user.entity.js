@@ -16,6 +16,7 @@ const property_entity_1 = require("../../properties/entities/property.entity");
 const user_role_enum_1 = require("../../common/enums/user-role.enum");
 const contract_entity_1 = require("../../contracts/entities/contract.entity");
 const notification_entity_1 = require("../../notifications/entities/notification.entity");
+const landlord_application_entity_1 = require("../../landlord-applications/entities/landlord-application.entity");
 let User = class User {
 };
 exports.User = User;
@@ -41,6 +42,18 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "phone", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ length: 255, nullable: true }),
+    __metadata("design:type", String)
+], User.prototype, "avatarUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], User.prototype, "bio", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 80, nullable: true, unique: true }),
+    __metadata("design:type", String)
+], User.prototype, "facebookId", void 0);
+__decorate([
     (0, typeorm_1.Column)({
         type: 'enum',
         enum: user_role_enum_1.UserRole,
@@ -52,6 +65,10 @@ __decorate([
     (0, typeorm_1.Column)({ default: true }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isActive", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'datetime', nullable: true }),
+    __metadata("design:type", Date)
+], User.prototype, "emailVerifiedAt", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
@@ -76,6 +93,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => notification_entity_1.Notification, (notification) => notification.user),
     __metadata("design:type", Array)
 ], User.prototype, "notifications", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => landlord_application_entity_1.LandlordApplication, (application) => application.user),
+    __metadata("design:type", Array)
+], User.prototype, "landlordApplications", void 0);
 exports.User = User = __decorate([
     (0, typeorm_1.Entity)({ name: 'users' })
 ], User);

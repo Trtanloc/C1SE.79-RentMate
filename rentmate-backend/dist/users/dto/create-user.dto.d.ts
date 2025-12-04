@@ -6,4 +6,6 @@ export declare class CreateUserDto {
     phone: string;
     role: UserRole;
     isActive?: boolean;
+    emailVerifiedAt?: Date;
+    facebookId?: string;
 }

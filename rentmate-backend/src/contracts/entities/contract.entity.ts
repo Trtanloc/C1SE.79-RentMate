@@ -21,6 +21,12 @@ export class Contract {
   @Column({ length: 100 })
   contractNumber: string;
 
+  @Column({ length: 200 })
+  title: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes?: string;
+
   @Column()
   propertyId: number;
 
@@ -47,6 +53,15 @@ export class Contract {
   })
   @JoinColumn({ name: 'ownerId' })
   owner: User;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  monthlyRent: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  depositAmount: number;
+
+  @Column({ default: false })
+  autoRenew: boolean;
 
   @Column({
     type: 'enum',

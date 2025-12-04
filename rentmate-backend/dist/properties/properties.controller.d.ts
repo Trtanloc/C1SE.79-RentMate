@@ -3,10 +3,11 @@ import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { Property } from './entities/property.entity';
+import { ListPropertiesDto } from './dto/list-properties.dto';
 export declare class PropertiesController {
     private readonly propertiesService;
     constructor(propertiesService: PropertiesService);
-    findAll(): Promise<{
+    findAll(filters: ListPropertiesDto): Promise<{
         success: boolean;
         data: Property[];
     }>;
@@ -14,12 +15,16 @@ export declare class PropertiesController {
         success: boolean;
         data: Property;
     }>;
-    create(createPropertyDto: CreatePropertyDto, req: Request): Promise<{
+    create(createPropertyDto: CreatePropertyDto, req: Request, photoFiles?: Express.Multer.File[]): Promise<{
         success: boolean;
         message: string;
         data: Property;
     }>;
-    update(id: number, updatePropertyDto: UpdatePropertyDto, req: Request): Promise<{
+    findMine(req: Request): Promise<{
+        success: boolean;
+        data: Property[];
+    }>;
+    update(id: number, updatePropertyDto: UpdatePropertyDto, req: Request, photoFiles?: Express.Multer.File[]): Promise<{
         success: boolean;
         message: string;
         data: Property;

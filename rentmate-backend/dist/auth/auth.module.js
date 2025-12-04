@@ -16,6 +16,8 @@ const auth_controller_1 = require("./auth.controller");
 const users_module_1 = require("../users/users.module");
 const jwt_strategy_1 = require("./strategies/jwt.strategy");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
+const verification_codes_module_1 = require("../verification-codes/verification-codes.module");
+const password_resets_module_1 = require("../password-resets/password-resets.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -24,6 +26,8 @@ exports.AuthModule = AuthModule = __decorate([
         imports: [
             config_1.ConfigModule,
             users_module_1.UsersModule,
+            verification_codes_module_1.VerificationCodesModule,
+            password_resets_module_1.PasswordResetsModule,
             passport_1.PassportModule.register({ defaultStrategy: 'jwt' }),
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],

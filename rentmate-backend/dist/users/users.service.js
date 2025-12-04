@@ -17,12 +17,35 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const user_entity_1 = require("./entities/user.entity");
+const user_role_enum_1 = require("../common/enums/user-role.enum");
+const property_status_enum_1 = require("../common/enums/property-status.enum");
+const contract_status_enum_1 = require("../common/enums/contract-status.enum");
 let UsersService = class UsersService {
     constructor(usersRepository) {
         this.usersRepository = usersRepository;
     }
-    findAll() {
-        return this.usersRepository.find();
+    findAll(query = {}) {
+        const qb = this.usersRepository
+            .createQueryBuilder('user')
+            .orderBy('user.updatedAt', 'DESC');
+        if (query.role) {
+            qb.andWhere('user.role = :role', { role: query.role });
+        }
+        if (typeof query.isActive === 'boolean') {
+            qb.andWhere('user.isActive = :isActive', {
+                isActive: query.isActive,
+            });
+        }
+        if (query.search) {
+            qb.andWhere('(LOWER(user.fullName) LIKE :search OR LOWER(user.email) LIKE :search)', { search: `%${query.search.toLowerCase()}%` });
+        }
+        if (query.limit) {
+            qb.take(query.limit);
+            if (query.page) {
+                qb.skip((query.page - 1) * query.limit);
+            }
+        }
+        return qb.getMany();
     }
     findById(id) {
         return this.usersRepository.findOne({ where: { id } });
@@ -39,6 +62,9 @@ let UsersService = class UsersService {
         return this.usersRepository.findOne({
             where: { email: normalizedEmail },
         });
+    }
+    findByFacebookId(facebookId) {
+        return this.usersRepository.findOne({ where: { facebookId } });
     }
     async create(createUserDto) {
         const normalizedEmail = createUserDto.email.toLowerCase();
@@ -66,6 +92,35 @@ let UsersService = class UsersService {
     async remove(id) {
         const user = await this.findOneOrFail(id);
         await this.usersRepository.remove(user);
+    }
+    async getHighlights(limit = 6) {
+        const safeLimit = Math.min(Math.max(limit, 1), 50);
+        const activeLandlords = await this.usersRepository
+            .createQueryBuilder('user')
+            .where('user.role = :role', { role: user_role_enum_1.UserRole.Landlord })
+            .andWhere('user.isActive = :active', { active: true })
+            .loadRelationCountAndMap('user.propertyCount', 'user.properties')
+            .loadRelationCountAndMap('user.activeListingCount', 'user.properties', 'activeListing', (qb) => qb.andWhere('activeListing.status = :status', {
+            status: property_status_enum_1.PropertyStatus.Available,
+        }))
+            .orderBy('user.updatedAt', 'DESC')
+            .take(safeLimit)
+            .getMany();
+        const featuredTenants = await this.usersRepository
+            .createQueryBuilder('user')
+            .where('user.role = :role', { role: user_role_enum_1.UserRole.Tenant })
+            .andWhere('user.isActive = :active', { active: true })
+            .loadRelationCountAndMap('user.completedContracts', 'user.contractsAsTenant', 'contract', (qb) => qb.andWhere('contract.status IN (:...statuses)', {
+            statuses: [
+                contract_status_enum_1.ContractStatus.Signed,
+                contract_status_enum_1.ContractStatus.Active,
+                contract_status_enum_1.ContractStatus.Completed,
+            ],
+        }))
+            .orderBy('user.updatedAt', 'DESC')
+            .take(safeLimit)
+            .getMany();
+        return { activeLandlords, featuredTenants };
     }
 };
 exports.UsersService = UsersService;

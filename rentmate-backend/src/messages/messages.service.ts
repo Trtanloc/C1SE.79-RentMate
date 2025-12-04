@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Message } from './entities/message.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { MessageSender } from '../common/enums/message-sender.enum';
+import { ConversationsService } from '../conversations/conversations.service';
 
 type LogMessageInput = {
   conversationId: string;
@@ -18,6 +19,7 @@ export class MessagesService {
   constructor(
     @InjectRepository(Message)
     private readonly messagesRepository: Repository<Message>,
+    private readonly conversationsService: ConversationsService,
   ) {}
 
   async findByConversationId(conversationId: string): Promise<Message[]> {
@@ -54,6 +56,8 @@ export class MessagesService {
         mode: createMessageDto.mode,
       });
     }
+
+    await this.conversationsService.touch(conversationId);
 
     return { message, reply };
   }

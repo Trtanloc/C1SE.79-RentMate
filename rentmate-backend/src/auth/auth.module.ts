@@ -7,11 +7,15 @@ import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { VerificationCodesModule } from '../verification-codes/verification-codes.module';
+import { PasswordResetsModule } from '../password-resets/password-resets.module';
 
 @Module({
   imports: [
     ConfigModule,
     UsersModule,
+    VerificationCodesModule,
+    PasswordResetsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

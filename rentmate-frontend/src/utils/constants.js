@@ -1,3 +1,5 @@
+import { BellRing, MessageSquare, ReceiptText, ScrollText } from 'lucide-react';
+
 export const UserRole = {
   Tenant: 'tenant',
   Landlord: 'landlord',
@@ -11,10 +13,19 @@ export const PropertyStatus = {
   Pending: 'pending',
 };
 
-export const statusLabels = {
-  [PropertyStatus.Available]: 'Available',
-  [PropertyStatus.Rented]: 'Rented',
-  [PropertyStatus.Pending]: 'Pending Approval',
+export const fallbackPropertyStatusMeta = {
+  [PropertyStatus.Available]: {
+    label: 'Available',
+    badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  [PropertyStatus.Rented]: {
+    label: 'Rented',
+    badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+  },
+  [PropertyStatus.Pending]: {
+    label: 'Pending Review',
+    badgeClass: 'border-sky-200 bg-sky-50 text-sky-700',
+  },
 };
 
 export const NotificationType = {
@@ -26,23 +37,44 @@ export const NotificationType = {
 
 export const notificationTypeMeta = {
   [NotificationType.Transaction]: {
-    label: 'Transaction',
+    label: 'Payment',
     badgeClass: 'border-sky-200 bg-sky-50 text-sky-700',
-    icon: '💰',
+    Icon: ReceiptText,
   },
   [NotificationType.Contract]: {
     label: 'Contract',
     badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
-    icon: '📄',
+    Icon: ScrollText,
   },
   [NotificationType.Reminder]: {
     label: 'Reminder',
     badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    icon: '⏰',
+    Icon: BellRing,
   },
   [NotificationType.System]: {
     label: 'System',
     badgeClass: 'border-gray-200 bg-gray-50 text-gray-700',
-    icon: '🛰️',
+    Icon: MessageSquare,
+  },
+};
+
+export const LandlordApplicationStatus = {
+  Pending: 'pending',
+  Approved: 'approved',
+  Rejected: 'rejected',
+};
+
+export const landlordApplicationStatusMeta = {
+  [LandlordApplicationStatus.Pending]: {
+    label: 'Pending review',
+    badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+  },
+  [LandlordApplicationStatus.Approved]: {
+    label: 'Approved',
+    badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  [LandlordApplicationStatus.Rejected]: {
+    label: 'Rejected',
+    badgeClass: 'border-rose-200 bg-rose-50 text-rose-700',
   },
 };

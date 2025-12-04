@@ -11,6 +11,7 @@ import { Property } from '../../properties/entities/property.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Contract } from '../../contracts/entities/contract.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
+import { LandlordApplication } from '../../landlord-applications/entities/landlord-application.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -30,6 +31,15 @@ export class User {
   @Column({ length: 20, nullable: true })
   phone?: string;
 
+  @Column({ length: 255, nullable: true })
+  avatarUrl?: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
+  @Column({ length: 80, nullable: true, unique: true })
+  facebookId?: string;
+
   @Column({
     type: 'enum',
     enum: UserRole,
@@ -39,6 +49,9 @@ export class User {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ type: 'datetime', nullable: true })
+  emailVerifiedAt?: Date;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -57,4 +70,10 @@ export class User {
 
   @OneToMany(() => Notification, (notification) => notification.user)
   notifications: Notification[];
+
+  @OneToMany(
+    () => LandlordApplication,
+    (application) => application.user,
+  )
+  landlordApplications: LandlordApplication[];
 }

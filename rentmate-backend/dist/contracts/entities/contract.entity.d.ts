@@ -5,12 +5,17 @@ import { Transaction } from '../../transactions/entities/transaction.entity';
 export declare class Contract {
     id: number;
     contractNumber: string;
+    title: string;
+    notes?: string;
     propertyId: number;
     property: Property;
     tenantId: number;
     tenant: User;
     ownerId: number;
     owner: User;
+    monthlyRent: number;
+    depositAmount: number;
+    autoRenew: boolean;
     status: ContractStatus;
     startDate?: string;
     endDate?: string;

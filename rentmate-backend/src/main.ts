@@ -19,8 +19,16 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(new ClassSerializerInterceptor(reflector));
 
+  const rawOrigins = configService.get<string>('CORS_ORIGIN');
+  const allowlist = rawOrigins
+    ? rawOrigins
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : ['http://localhost:5173'];
+
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN') || true,
+    origin: allowlist,
     credentials: true,
   });
 

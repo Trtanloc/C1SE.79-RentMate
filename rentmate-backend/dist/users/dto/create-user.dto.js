@@ -26,7 +26,7 @@ __decorate([
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "fullName", void 0);
 __decorate([
-    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.IsEmail)({ require_tld: false }),
     (0, class_validator_1.MaxLength)(100),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "email", void 0);
@@ -58,4 +58,14 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], CreateUserDto.prototype, "isActive", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Date)
+], CreateUserDto.prototype, "emailVerifiedAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(80),
+    __metadata("design:type", String)
+], CreateUserDto.prototype, "facebookId", void 0);
 //# sourceMappingURL=create-user.dto.js.map

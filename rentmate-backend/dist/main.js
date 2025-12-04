@@ -16,8 +16,15 @@ async function bootstrap() {
         transformOptions: { enableImplicitConversion: true },
     }));
     app.useGlobalInterceptors(new common_1.ClassSerializerInterceptor(reflector));
+    const rawOrigins = configService.get('CORS_ORIGIN');
+    const allowlist = rawOrigins
+        ? rawOrigins
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : ['http://localhost:5173'];
     app.enableCors({
-        origin: configService.get('CORS_ORIGIN') || true,
+        origin: allowlist,
         credentials: true,
     });
     const port = configService.get('PORT') || 3000;

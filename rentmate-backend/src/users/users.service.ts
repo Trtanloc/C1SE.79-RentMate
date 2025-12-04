@@ -8,6 +8,10 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ListUsersDto } from './dto/list-users.dto';
+import { UserRole } from '../common/enums/user-role.enum';
+import { PropertyStatus } from '../common/enums/property-status.enum';
+import { ContractStatus } from '../common/enums/contract-status.enum';
 
 @Injectable()
 export class UsersService {
@@ -16,8 +20,36 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
-  findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  findAll(query: ListUsersDto = {} as ListUsersDto): Promise<User[]> {
+    const qb = this.usersRepository
+      .createQueryBuilder('user')
+      .orderBy('user.updatedAt', 'DESC');
+
+    if (query.role) {
+      qb.andWhere('user.role = :role', { role: query.role });
+    }
+
+    if (typeof query.isActive === 'boolean') {
+      qb.andWhere('user.isActive = :isActive', {
+        isActive: query.isActive,
+      });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(user.fullName) LIKE :search OR LOWER(user.email) LIKE :search)',
+        { search: `%${query.search.toLowerCase()}%` },
+      );
+    }
+
+    if (query.limit) {
+      qb.take(query.limit);
+      if (query.page) {
+        qb.skip((query.page - 1) * query.limit);
+      }
+    }
+
+    return qb.getMany();
   }
 
   findById(id: number): Promise<User | null> {
@@ -37,6 +69,10 @@ export class UsersService {
     return this.usersRepository.findOne({
       where: { email: normalizedEmail },
     });
+  }
+
+  findByFacebookId(facebookId: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { facebookId } });
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -77,5 +113,50 @@ export class UsersService {
   async remove(id: number): Promise<void> {
     const user = await this.findOneOrFail(id);
     await this.usersRepository.remove(user);
+  }
+
+  async getHighlights(limit = 6) {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+
+    const activeLandlords = await this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.Landlord })
+      .andWhere('user.isActive = :active', { active: true })
+      .loadRelationCountAndMap('user.propertyCount', 'user.properties')
+      .loadRelationCountAndMap(
+        'user.activeListingCount',
+        'user.properties',
+        'activeListing',
+        (qb) =>
+          qb.andWhere('activeListing.status = :status', {
+            status: PropertyStatus.Available,
+          }),
+      )
+      .orderBy('user.updatedAt', 'DESC')
+      .take(safeLimit)
+      .getMany();
+
+    const featuredTenants = await this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.Tenant })
+      .andWhere('user.isActive = :active', { active: true })
+      .loadRelationCountAndMap(
+        'user.completedContracts',
+        'user.contractsAsTenant',
+        'contract',
+        (qb) =>
+          qb.andWhere('contract.status IN (:...statuses)', {
+            statuses: [
+              ContractStatus.Signed,
+              ContractStatus.Active,
+              ContractStatus.Completed,
+            ],
+          }),
+      )
+      .orderBy('user.updatedAt', 'DESC')
+      .take(safeLimit)
+      .getMany();
+
+    return { activeLandlords, featuredTenants };
   }
 }

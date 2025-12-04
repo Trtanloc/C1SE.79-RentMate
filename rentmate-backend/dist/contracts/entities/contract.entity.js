@@ -27,6 +27,14 @@ __decorate([
     __metadata("design:type", String)
 ], Contract.prototype, "contractNumber", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ length: 200 }),
+    __metadata("design:type", String)
+], Contract.prototype, "title", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Contract.prototype, "notes", void 0);
+__decorate([
     (0, typeorm_1.Column)(),
     __metadata("design:type", Number)
 ], Contract.prototype, "propertyId", void 0);
@@ -59,6 +67,18 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: 'ownerId' }),
     __metadata("design:type", user_entity_1.User)
 ], Contract.prototype, "owner", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 12, scale: 2 }),
+    __metadata("design:type", Number)
+], Contract.prototype, "monthlyRent", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 12, scale: 2, default: 0 }),
+    __metadata("design:type", Number)
+], Contract.prototype, "depositAmount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ default: false }),
+    __metadata("design:type", Boolean)
+], Contract.prototype, "autoRenew", void 0);
 __decorate([
     (0, typeorm_1.Column)({
         type: 'enum',

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
+import Home from './pages/Home.jsx';
 import PropertyList from './pages/PropertyList.jsx';
 import PropertyDetail from './pages/PropertyDetail.jsx';
 import Login from './pages/Login.jsx';
@@ -8,6 +9,15 @@ import Dashboard from './pages/Dashboard.jsx';
 import NotificationsPage from './pages/NotificationsPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ChatBox from './components/ChatBox.jsx';
+import LandlordApplicationPage from './pages/LandlordApplication.jsx';
+import AdminPage from './pages/Admin.jsx';
+import FavoritesPage from './pages/Favorites.jsx';
+import ProfilePage from './pages/Profile.jsx';
+import ForgotPasswordPage from './pages/ForgotPassword.jsx';
+import PaymentsPage from './pages/Payments.jsx';
+import MessagesPage from './pages/Messages.jsx';
+import ContractsPage from './pages/Contracts.jsx';
+import { UserRole } from './utils/constants.js';
 
 const App = () => {
   return (
@@ -15,7 +25,7 @@ const App = () => {
       <Navbar />
       <main>
         <Routes>
-          <Route path="/" element={<PropertyList />} />
+          <Route path="/" element={<Home />} />
           <Route path="/properties" element={<PropertyList />} />
           <Route path="/properties/:id" element={<PropertyDetail />} />
           <Route path="/login" element={<Login />} />
@@ -33,6 +43,63 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <NotificationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/favorites"
+            element={
+              <ProtectedRoute>
+                <FavoritesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <PaymentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contracts"
+            element={
+              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
+                <ContractsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <MessagesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route
+            path="/apply-landlord"
+            element={
+              <ProtectedRoute roles={[UserRole.Tenant]}>
+                <LandlordApplicationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute roles={[UserRole.Admin]}>
+                <AdminPage />
               </ProtectedRoute>
             }
           />

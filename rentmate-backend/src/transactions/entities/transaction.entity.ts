@@ -26,6 +26,27 @@ export class Transaction {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
 
+  @Column({ length: 3, default: 'VND' })
+  currency: string;
+
+  @Column({ length: 40, nullable: true })
+  reference?: string;
+
+  @Column({ length: 40, default: 'manual' })
+  paymentProvider: string;
+
+  @Column({ length: 120, nullable: true })
+  paymentIntentId?: string;
+
+  @Column({ length: 500, nullable: true })
+  paymentUrl?: string;
+
+  @Column({ name: 'payment_token_hash', length: 128, nullable: true })
+  paymentTokenHash?: string;
+
+  @Column({ length: 40, default: 'bank-transfer' })
+  method: string;
+
   @Column({
     type: 'enum',
     enum: TransactionStatus,
@@ -36,8 +57,14 @@ export class Transaction {
   @Column({ length: 200, nullable: true })
   description?: string;
 
+  @Column({ type: 'text', nullable: true })
+  notes?: string;
+
   @Column({ type: 'timestamp', nullable: true })
   paidAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  metadata?: string;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -1,21 +1,20 @@
-import { notificationTypeMeta } from '../utils/constants.js';
+import { BellRing } from 'lucide-react';
+import { useMetadata } from '../context/MetadataContext.jsx';
+import { notificationTypeMeta as notificationMetaFallback } from '../utils/constants.js';
 
 const defaultMeta = {
   label: 'Update',
   badgeClass: 'border-gray-200 bg-gray-50 text-gray-700',
-  icon: '🔔',
+  Icon: BellRing,
 };
 
-export const NotificationItem = ({
-  notification,
-  onMarkRead,
-  onDelete,
-}) => {
-  const meta =
-    notificationTypeMeta[notification.type] ?? defaultMeta;
+export const NotificationItem = ({ notification, onMarkRead, onDelete }) => {
+  const { notificationTypeMeta } = useMetadata();
+  const meta = notificationTypeMeta[notification.type] ?? notificationMetaFallback[notification.type] ?? defaultMeta;
+  const Icon = meta.Icon ?? BellRing;
 
   const formattedDate = notification.createdAt
-    ? new Date(notification.createdAt).toLocaleString()
+    ? new Date(notification.createdAt).toLocaleString('vi-VN')
     : '';
 
   return (
@@ -25,7 +24,7 @@ export const NotificationItem = ({
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${meta.badgeClass}`}
           >
-            <span aria-hidden="true">{meta.icon}</span>
+            <Icon className="h-3.5 w-3.5" />
             {meta.label}
           </span>
           {!notification.isRead && (
@@ -67,10 +66,10 @@ const NotificationList = ({ items, onMarkRead, onDelete }) => {
     return (
       <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-gray-500">
         <p className="text-base font-medium text-gray-700">
-          You're all caught up
+          You are all caught up
         </p>
         <p className="text-sm text-gray-500">
-          New deposit, contract, and system alerts will appear here.
+          Payment, contract, and system updates will appear here automatically.
         </p>
       </div>
     );

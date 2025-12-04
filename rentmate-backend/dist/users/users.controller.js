@@ -22,6 +22,7 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const user_role_enum_1 = require("../common/enums/user-role.enum");
+const list_users_dto_1 = require("./dto/list-users.dto");
 let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
@@ -35,11 +36,18 @@ let UsersController = class UsersController {
             data: user,
         };
     }
-    async findAll() {
-        const users = await this.usersService.findAll();
+    async findAll(query) {
+        const users = await this.usersService.findAll(query);
         return {
             success: true,
             data: users,
+        };
+    }
+    async getHighlights(limit) {
+        const data = await this.usersService.getHighlights(limit);
+        return {
+            success: true,
+            data,
         };
     }
     async findOne(id, req) {
@@ -51,7 +59,12 @@ let UsersController = class UsersController {
         };
     }
     async update(id, updateUserDto, req) {
-        this.ensureOwnershipOrAdmin(req.user, id);
+        const actor = req.user;
+        this.ensureOwnershipOrAdmin(actor, id);
+        if (actor.role !== user_role_enum_1.UserRole.Admin &&
+            typeof updateUserDto.role !== 'undefined') {
+            throw new common_1.ForbiddenException('You cannot change the user role');
+        }
         const payload = Object.assign({}, updateUserDto);
         if (updateUserDto.password) {
             payload.password = await bcrypt.hash(updateUserDto.password, 10);
@@ -95,10 +108,19 @@ __decorate([
 __decorate([
     (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.Admin),
     (0, common_1.Get)(),
+    __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [list_users_dto_1.ListUsersDto]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "findAll", null);
+__decorate([
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.Admin),
+    (0, common_1.Get)('highlights'),
+    __param(0, (0, common_1.Query)('limit', new common_1.DefaultValuePipe(6), common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getHighlights", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),

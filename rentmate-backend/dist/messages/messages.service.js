@@ -18,9 +18,11 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const message_entity_1 = require("./entities/message.entity");
 const message_sender_enum_1 = require("../common/enums/message-sender.enum");
+const conversations_service_1 = require("../conversations/conversations.service");
 let MessagesService = class MessagesService {
-    constructor(messagesRepository) {
+    constructor(messagesRepository, conversationsService) {
         this.messagesRepository = messagesRepository;
+        this.conversationsService = conversationsService;
     }
     async findByConversationId(conversationId) {
         return this.messagesRepository.find({
@@ -51,6 +53,7 @@ let MessagesService = class MessagesService {
                 mode: createMessageDto.mode,
             });
         }
+        await this.conversationsService.touch(conversationId);
         return { message, reply };
     }
     async logMessage(input) {
@@ -69,6 +72,7 @@ exports.MessagesService = MessagesService;
 exports.MessagesService = MessagesService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(message_entity_1.Message)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        conversations_service_1.ConversationsService])
 ], MessagesService);
 //# sourceMappingURL=messages.service.js.map

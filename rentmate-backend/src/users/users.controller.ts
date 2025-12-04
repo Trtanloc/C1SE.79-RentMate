@@ -8,8 +8,10 @@ import {
   Post,
   Put,
   Req,
+  Query,
   UseGuards,
   ForbiddenException,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Request } from 'express';
@@ -21,6 +23,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 import { User } from './entities/user.entity';
+import { ListUsersDto } from './dto/list-users.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
@@ -44,11 +47,24 @@ export class UsersController {
 
   @Roles(UserRole.Admin)
   @Get()
-  async findAll() {
-    const users = await this.usersService.findAll();
+  async findAll(@Query() query: ListUsersDto) {
+    const users = await this.usersService.findAll(query);
     return {
       success: true,
       data: users,
+    };
+  }
+
+  @Roles(UserRole.Admin)
+  @Get('highlights')
+  async getHighlights(
+    @Query('limit', new DefaultValuePipe(6), ParseIntPipe)
+    limit: number,
+  ) {
+    const data = await this.usersService.getHighlights(limit);
+    return {
+      success: true,
+      data,
     };
   }
 
@@ -71,7 +87,16 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
     @Req() req: Request,
   ) {
-    this.ensureOwnershipOrAdmin(req.user as User, id);
+    const actor = req.user as User;
+    this.ensureOwnershipOrAdmin(actor, id);
+
+    if (
+      actor.role !== UserRole.Admin &&
+      typeof updateUserDto.role !== 'undefined'
+    ) {
+      throw new ForbiddenException('You cannot change the user role');
+    }
+
     const payload: UpdateUserDto = { ...updateUserDto };
     if (updateUserDto.password) {
       payload.password = await bcrypt.hash(updateUserDto.password, 10);

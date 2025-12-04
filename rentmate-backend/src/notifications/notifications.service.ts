@@ -5,14 +5,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as nodemailer from 'nodemailer';
 import { Notification } from './entities/notification.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationType } from '../common/enums/notification-type.enum';
 import { User } from '../users/entities/user.entity';
+import { MailerService } from '../mail/mailer.service';
 
 type FindNotificationsOptions = {
   userId: number;
@@ -24,38 +23,14 @@ type FindNotificationsOptions = {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private readonly transporter?: nodemailer.Transporter;
-  private readonly senderAddress?: string;
 
   constructor(
     @InjectRepository(Notification)
     private readonly notificationsRepository: Repository<Notification>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-    private readonly configService: ConfigService,
-  ) {
-    const host = this.configService.get<string>('MAIL_HOST', 'smtp.gmail.com');
-    const port = Number(this.configService.get<string>('MAIL_PORT', '587'));
-    const secure =
-      this.configService.get<string>('MAIL_SECURE', 'false') === 'true';
-    const user = this.configService.get<string>('MAIL_USER');
-    const pass = this.configService.get<string>('MAIL_PASS');
-    this.senderAddress =
-      this.configService.get<string>('MAIL_FROM') ||
-      (user ? `RentMate <${user}>` : undefined);
-
-    if (user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: {
-          user,
-          pass,
-        },
-      });
-    }
-  }
+    private readonly mailerService: MailerService,
+  ) {}
 
   async create(
     createNotificationDto: CreateNotificationDto,
@@ -152,16 +127,8 @@ export class NotificationsService {
   }
 
   private async dispatchEmail(user: User, notification: Notification) {
-    if (!this.transporter || !this.senderAddress) {
-      this.logger.warn(
-        `Email transporter is not configured. Skipping email for notification ${notification.id}`,
-      );
-      return;
-    }
-
     try {
-      await this.transporter.sendMail({
-        from: this.senderAddress,
+      await this.mailerService.send({
         to: user.email,
         subject: notification.title,
         html: `
@@ -185,4 +152,3 @@ export class NotificationsService {
     }
   }
 }
-

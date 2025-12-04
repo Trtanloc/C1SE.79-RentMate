@@ -14,6 +14,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserRole } from '../common/enums/user-role.enum';
 import { MessageSender } from '../common/enums/message-sender.enum';
+import { ConversationsService } from '../conversations/conversations.service';
 
 type RequestUser = {
   id: number;
@@ -24,17 +25,20 @@ type RequestUser = {
 @UseGuards(JwtAuthGuard)
 @Controller('messages')
 export class MessagesController {
-  constructor(private readonly messagesService: MessagesService) {}
+  constructor(
+    private readonly messagesService: MessagesService,
+    private readonly conversationsService: ConversationsService,
+  ) {}
 
   @Get(':conversationId')
   findByConversationId(
     @Param('conversationId') conversationId: string,
     @Req() request: Request,
   ) {
-    const tenant = this.assertTenant(request.user as RequestUser | undefined);
-    const expectedConversationId = this.getTenantConversationId(tenant);
-    this.ensureConversationAccess(conversationId, expectedConversationId);
-    return this.messagesService.findByConversationId(conversationId);
+    const user = request.user as RequestUser;
+    return this.conversationsService
+      .getAuthorized(conversationId, user)
+      .then(() => this.messagesService.findByConversationId(conversationId));
   }
 
   @Post()
@@ -42,38 +46,32 @@ export class MessagesController {
     @Body() createMessageDto: CreateMessageDto,
     @Req() request: Request,
   ) {
-    const tenant = this.assertTenant(request.user as RequestUser | undefined);
-    const expectedConversationId = this.getTenantConversationId(tenant);
-    const conversationId =
-      createMessageDto.conversationId ?? expectedConversationId;
-    this.ensureConversationAccess(conversationId, expectedConversationId);
-
-    return this.messagesService.create({
-      ...createMessageDto,
-      conversationId,
-      senderId: tenant.id,
-      senderType: MessageSender.Tenant,
-    });
-  }
-
-  private ensureConversationAccess(
-    conversationId: string,
-    expectedConversationId: string,
-  ) {
-    if (conversationId !== expectedConversationId) {
-      throw new ForbiddenException('You cannot access this conversation.');
+    const user = request.user as RequestUser;
+    const conversationId = createMessageDto.conversationId;
+    if (!conversationId) {
+      throw new ForbiddenException('Conversation is required');
     }
+
+    return this.conversationsService
+      .getAuthorized(conversationId, user)
+      .then(() =>
+        this.messagesService.create({
+          ...createMessageDto,
+          conversationId,
+          senderId: user.id,
+          senderType: this.resolveSenderType(user.role),
+        }),
+      );
   }
 
-  private getTenantConversationId(user: RequestUser) {
-    return `tenant-${user.id}`;
-  }
-
-  private assertTenant(user: RequestUser | undefined): RequestUser {
-    if (!user || user.role !== UserRole.Tenant) {
-      throw new ForbiddenException('Only tenants can access this chat history.');
+  private resolveSenderType(role: UserRole) {
+    if (role === UserRole.Landlord) {
+      return MessageSender.Owner;
     }
-    return user;
+    if (role === UserRole.Admin || role === UserRole.Manager) {
+      return MessageSender.Assistant;
+    }
+    return MessageSender.Tenant;
   }
 }
 

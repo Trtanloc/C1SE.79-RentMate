@@ -19,37 +19,36 @@ const create_message_dto_1 = require("./dto/create-message.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const user_role_enum_1 = require("../common/enums/user-role.enum");
 const message_sender_enum_1 = require("../common/enums/message-sender.enum");
+const conversations_service_1 = require("../conversations/conversations.service");
 let MessagesController = class MessagesController {
-    constructor(messagesService) {
+    constructor(messagesService, conversationsService) {
         this.messagesService = messagesService;
+        this.conversationsService = conversationsService;
     }
     findByConversationId(conversationId, request) {
-        const tenant = this.assertTenant(request.user);
-        const expectedConversationId = this.getTenantConversationId(tenant);
-        this.ensureConversationAccess(conversationId, expectedConversationId);
-        return this.messagesService.findByConversationId(conversationId);
+        const user = request.user;
+        return this.conversationsService
+            .getAuthorized(conversationId, user)
+            .then(() => this.messagesService.findByConversationId(conversationId));
     }
     create(createMessageDto, request) {
-        var _a;
-        const tenant = this.assertTenant(request.user);
-        const expectedConversationId = this.getTenantConversationId(tenant);
-        const conversationId = (_a = createMessageDto.conversationId) !== null && _a !== void 0 ? _a : expectedConversationId;
-        this.ensureConversationAccess(conversationId, expectedConversationId);
-        return this.messagesService.create(Object.assign(Object.assign({}, createMessageDto), { conversationId, senderId: tenant.id, senderType: message_sender_enum_1.MessageSender.Tenant }));
-    }
-    ensureConversationAccess(conversationId, expectedConversationId) {
-        if (conversationId !== expectedConversationId) {
-            throw new common_1.ForbiddenException('You cannot access this conversation.');
+        const user = request.user;
+        const conversationId = createMessageDto.conversationId;
+        if (!conversationId) {
+            throw new common_1.ForbiddenException('Conversation is required');
         }
+        return this.conversationsService
+            .getAuthorized(conversationId, user)
+            .then(() => this.messagesService.create(Object.assign(Object.assign({}, createMessageDto), { conversationId, senderId: user.id, senderType: this.resolveSenderType(user.role) })));
     }
-    getTenantConversationId(user) {
-        return `tenant-${user.id}`;
-    }
-    assertTenant(user) {
-        if (!user || user.role !== user_role_enum_1.UserRole.Tenant) {
-            throw new common_1.ForbiddenException('Only tenants can access this chat history.');
+    resolveSenderType(role) {
+        if (role === user_role_enum_1.UserRole.Landlord) {
+            return message_sender_enum_1.MessageSender.Owner;
         }
-        return user;
+        if (role === user_role_enum_1.UserRole.Admin || role === user_role_enum_1.UserRole.Manager) {
+            return message_sender_enum_1.MessageSender.Assistant;
+        }
+        return message_sender_enum_1.MessageSender.Tenant;
     }
 };
 exports.MessagesController = MessagesController;
@@ -72,6 +71,7 @@ __decorate([
 exports.MessagesController = MessagesController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('messages'),
-    __metadata("design:paramtypes", [messages_service_1.MessagesService])
+    __metadata("design:paramtypes", [messages_service_1.MessagesService,
+        conversations_service_1.ConversationsService])
 ], MessagesController);
 //# sourceMappingURL=messages.controller.js.map

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +10,7 @@ import { MessagesService } from '../messages/messages.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageSender } from '../common/enums/message-sender.enum';
 import { PropertyStatus } from '../common/enums/property-status.enum';
+import { detectVietnamCity } from '../common/constants/vietnam-cities';
 
 type GeminiCandidate = {
   content?: {
@@ -73,7 +74,7 @@ export class AiService {
     }
 
     if (!options?.skipLog) {
-      this.logger.log('✅ Connected to DB');
+      this.logger.log('Connected to DB');
     }
   }
 
@@ -100,7 +101,7 @@ export class AiService {
       user.fullName,
       contextResult?.context,
     );
-    this.logger.log('✅ Sending data to Gemini API');
+    this.logger.log('Sending data to Gemini API');
     const reply = await this.requestGemini(prompt);
 
     await this.messagesService.logMessage({
@@ -146,7 +147,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
   private async requestGemini(prompt: string): Promise<string> {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
-      this.logger.error('Missing GEMINI_API_KEY – returning fallback answer.');
+      this.logger.error('Missing GEMINI_API_KEY - returning fallback answer.');
       return 'RentMate chưa được cấu hình khóa Gemini. Vui lòng liên hệ quản trị viên.';
     }
 
@@ -184,7 +185,6 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       return 'Gemini đang bận, vui lòng thử lại trong ít phút nữa.';
     }
   }
-
   private async buildDatabaseContext(
     message: string,
     tenantId: number,
@@ -235,14 +235,14 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 
     try {
       const properties = await this.fetchCandidateProperties(filters);
-      this.logger.log(`? Retrieved ${properties.length} properties`);
+      this.logger.log(`Retrieved ${properties.length} properties`);
 
       if (!properties.length) {
-        return `Kh?ng c? b?t ??ng s?n ph? h?p${
-          filters.city ? ` t?i ${filters.city}` : ''
+        return `Không có bất động sản phù hợp${
+          filters.city ? ` tại ${filters.city}` : ''
         }${
           filters.maxBudget
-            ? ` v?i ng?n s?ch ${this.formatCurrency(filters.maxBudget)}`
+            ? ` với ngân sách ${this.formatCurrency(filters.maxBudget)}`
             : ''
         }.`;
       }
@@ -253,31 +253,31 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       const clusterSummary = this.describeClusterSummary(ranked);
 
       const lines = ranked.map((item, index) => {
-        const ownerName = item.property.owner?.fullName ?? 'Ch?a c?p nh?t';
-        return `${index + 1}. ${item.property.title} (${item.property.address}) ? ${this.formatCurrency(
+        const ownerName = item.property.owner?.fullName ?? 'Chưa cập nhật';
+        return `${index + 1}. ${item.property.title} (${item.property.address}) • ${this.formatCurrency(
           Number(item.property.price),
-        )}/th?ng, di?n t?ch ${item.property.area}m2, ch? nh?: ${ownerName}, ?i?m MCDM: ${item.score}`;
+        )}/tháng, diện tích ${item.property.area}m2, chủ nhà: ${ownerName}, Điểm MCDM: ${item.score}`;
       });
 
       return [
-        'G?i ? b?t ??ng s?n t? c? s? d? li?u + MCDM:',
+        'Gợi ý bất động sản từ cơ sở dữ liệu + MCDM:',
         ...lines,
         clusterSummary,
       ].join('\n');
     } catch (error) {
       this.logger.error('Failed to gather property recommendations', error);
-      return 'Ch?ng t?i t?m th?i kh?ng truy v?n ???c d? li?u b?t ??ng s?n. Vui l?ng th? l?i sau.';
+      return 'Chúng tôi tạm thời không truy vấn được dữ liệu bất động sản. Vui lòng thử lại sau.';
     }
   }
 
   private parseRecommendationFilters(message: string): RecommendationFilters {
     const normalized = message.toLowerCase();
     const mentionsProperty =
-      /(c?n h?|chung c?|apartment|nh? thu?|thu? nh?|property|b?t ??ng s?n)/.test(
+      /(can ho|căn hộ|chung cu|apartment|nha thue|thuê nhà|property|bất động sản)/.test(
         normalized,
       );
     const mentionsPrice =
-      /(gi?|price|bao nhi?u|d??i|t?m|kho?ng|budget)/.test(normalized);
+      /(giá|price|bao nhiêu|dưới|tầm|khoảng|budget)/.test(normalized);
     const maxBudget = this.extractBudget(message);
     const city = this.extractCity(message);
 
@@ -312,10 +312,9 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     }
 
     if (filters.city) {
-      query.andWhere(
-        '(property.address LIKE :city OR property.title LIKE :city)',
-        { city: `%${filters.city}%` },
-      );
+      query.andWhere('LOWER(property.city) = LOWER(:city)', {
+        city: filters.city,
+      });
     }
 
     return query.orderBy('property.price', 'ASC').limit(10).getMany();
@@ -401,7 +400,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 
   private describeClusterSummary(ranked: RankedProperty[]): string {
     if (!ranked.length) {
-      return 'Kh?ng c? d? li?u ph?n c?m.';
+      return 'Không có dữ liệu phân cụm.';
     }
 
     const counts: Record<BudgetCluster, number> = {
@@ -415,16 +414,16 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     });
 
     const labels: Record<BudgetCluster, string> = {
-      budget: 'ti?t ki?m',
-      balanced: 'c?n b?ng',
-      premium: 'cao c?p',
+      budget: 'tiết kiệm',
+      balanced: 'cân bằng',
+      premium: 'cao cấp',
     };
 
     const summary = (Object.keys(labels) as BudgetCluster[])
       .map((cluster) => `${labels[cluster]}: ${counts[cluster]}`)
-      .join(' ? ');
+      .join(' | ');
 
-    return `Ph?n c?m ng?n s?ch (MCDM): ${summary}`;
+    return `Phân cụm ngân sách (MCDM): ${summary}`;
   }
   private async lookupLatestContractStatus(
     message: string,
@@ -451,9 +450,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 
     const contract = await query.getOne();
     if (!contract) {
-      return `Không tìm thấy hợp đồng nào của người thuê #${tenantId}${
-        ownerName ? ` với chủ nhà ${ownerName}` : ''
-      }.`;
+      return `Không tìm thấy hợp đồng nào của người thuê #${tenantId}${ownerName ? ` với chủ nhà ${ownerName}` : ''}.`;
     }
 
     const signedAt = contract.signedAt
@@ -464,9 +461,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 - Số hợp đồng: ${contract.contractNumber}
 - Chủ nhà: ${contract.owner?.fullName ?? 'Chưa cập nhật'}
 - Bất động sản: ${contract.property?.title ?? 'Không rõ'}
-- Thời hạn: ${contract.startDate ?? 'N/A'} → ${
-      contract.endDate ?? 'N/A'
-    }
+- Thời hạn: ${contract.startDate ?? 'N/A'} → ${contract.endDate ?? 'N/A'}
 - Trạng thái: ${contract.status}
 - Ngày ký: ${signedAt}`;
   }
@@ -508,10 +503,9 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 - Trạng thái: ${transaction.status}
 - Ngày thanh toán: ${paidAt}`;
   }
-
   private extractBudget(message: string): number | undefined {
     const budgetRegex =
-      /(?:giá|dưới|under|tối đa|max|budget|khoảng)\D*(\d+(?:[.,]\d+)?)(?:\s*)(triệu|tr|million|tỷ|ty|nghìn|ngàn|k)?/i;
+      /(?:giá|dưới|under|tối đa|max|budget|khoảng)\D*(\d+(?:[.,]\d+)?)(?:\s*)(triệu|tr|million|tỷ|ty|nghìn|ngan|k)?/i;
     const match = message.match(budgetRegex);
     if (!match) {
       return undefined;
@@ -531,7 +525,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       return value * 1_000_000_000;
     }
 
-    if (unit.includes('nghìn') || unit.includes('ngàn') || unit === 'k') {
+    if (unit.includes('nghìn') || unit.includes('ngan') || unit === 'k') {
       return value * 1_000;
     }
 
@@ -539,13 +533,18 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
   }
 
   private extractCity(message: string): string | undefined {
+    const directMatch = detectVietnamCity(message);
+    if (directMatch) {
+      return directMatch;
+    }
+
     const cityRegex = /(?:ở|tai|tại|in)\s+([\p{L}\s]+?)(?=[\.,!?]|$)/iu;
     const match = message.match(cityRegex);
     if (!match) {
       return undefined;
     }
 
-    return match[1].trim();
+    return detectVietnamCity(match[1]) ?? match[1].trim();
   }
 
   private extractOwnerName(message: string): string | undefined {
@@ -568,3 +567,9 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     }).format(value);
   }
 }
+
+
+
+
+
+

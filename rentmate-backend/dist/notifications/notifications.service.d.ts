@@ -1,9 +1,9 @@
-import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationType } from '../common/enums/notification-type.enum';
 import { User } from '../users/entities/user.entity';
+import { MailerService } from '../mail/mailer.service';
 type FindNotificationsOptions = {
     userId: number;
     type?: NotificationType;
@@ -13,11 +13,9 @@ type FindNotificationsOptions = {
 export declare class NotificationsService {
     private readonly notificationsRepository;
     private readonly usersRepository;
-    private readonly configService;
+    private readonly mailerService;
     private readonly logger;
-    private readonly transporter?;
-    private readonly senderAddress?;
-    constructor(notificationsRepository: Repository<Notification>, usersRepository: Repository<User>, configService: ConfigService);
+    constructor(notificationsRepository: Repository<Notification>, usersRepository: Repository<User>, mailerService: MailerService);
     create(createNotificationDto: CreateNotificationDto): Promise<Notification>;
     findByUser({ userId, type, isRead, limit, }: FindNotificationsOptions): Promise<Notification[]>;
     countUnread(userId: number): Promise<number>;

@@ -12,6 +12,9 @@ const typeorm_1 = require("@nestjs/typeorm");
 const properties_service_1 = require("./properties.service");
 const properties_controller_1 = require("./properties.controller");
 const property_entity_1 = require("./entities/property.entity");
+const property_photo_entity_1 = require("./entities/property-photo.entity");
+const property_amenity_entity_1 = require("./entities/property-amenity.entity");
+const review_entity_1 = require("../reviews/entities/review.entity");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 let PropertiesModule = class PropertiesModule {
@@ -19,9 +22,12 @@ let PropertiesModule = class PropertiesModule {
 exports.PropertiesModule = PropertiesModule;
 exports.PropertiesModule = PropertiesModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([property_entity_1.Property])],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([property_entity_1.Property, property_photo_entity_1.PropertyPhoto, property_amenity_entity_1.PropertyAmenity, review_entity_1.Review]),
+        ],
         controllers: [properties_controller_1.PropertiesController],
         providers: [properties_service_1.PropertiesService, roles_guard_1.RolesGuard, jwt_auth_guard_1.JwtAuthGuard],
+        exports: [properties_service_1.PropertiesService],
     })
 ], PropertiesModule);
 //# sourceMappingURL=properties.module.js.map

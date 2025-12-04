@@ -15,38 +15,18 @@ var NotificationsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
-const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
-const nodemailer = require("nodemailer");
 const notification_entity_1 = require("./entities/notification.entity");
 const notification_type_enum_1 = require("../common/enums/notification-type.enum");
 const user_entity_1 = require("../users/entities/user.entity");
+const mailer_service_1 = require("../mail/mailer.service");
 let NotificationsService = NotificationsService_1 = class NotificationsService {
-    constructor(notificationsRepository, usersRepository, configService) {
+    constructor(notificationsRepository, usersRepository, mailerService) {
         this.notificationsRepository = notificationsRepository;
         this.usersRepository = usersRepository;
-        this.configService = configService;
+        this.mailerService = mailerService;
         this.logger = new common_1.Logger(NotificationsService_1.name);
-        const host = this.configService.get('MAIL_HOST', 'smtp.gmail.com');
-        const port = Number(this.configService.get('MAIL_PORT', '587'));
-        const secure = this.configService.get('MAIL_SECURE', 'false') === 'true';
-        const user = this.configService.get('MAIL_USER');
-        const pass = this.configService.get('MAIL_PASS');
-        this.senderAddress =
-            this.configService.get('MAIL_FROM') ||
-                (user ? `RentMate <${user}>` : undefined);
-        if (user && pass) {
-            this.transporter = nodemailer.createTransport({
-                host,
-                port,
-                secure,
-                auth: {
-                    user,
-                    pass,
-                },
-            });
-        }
     }
     async create(createNotificationDto) {
         const user = await this.usersRepository.findOne({
@@ -109,13 +89,8 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         return (type === notification_type_enum_1.NotificationType.Transaction || type === notification_type_enum_1.NotificationType.Contract);
     }
     async dispatchEmail(user, notification) {
-        if (!this.transporter || !this.senderAddress) {
-            this.logger.warn(`Email transporter is not configured. Skipping email for notification ${notification.id}`);
-            return;
-        }
         try {
-            await this.transporter.sendMail({
-                from: this.senderAddress,
+            await this.mailerService.send({
                 to: user.email,
                 subject: notification.title,
                 html: `
@@ -142,6 +117,6 @@ exports.NotificationsService = NotificationsService = NotificationsService_1 = _
     __param(1, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
-        config_1.ConfigService])
+        mailer_service_1.MailerService])
 ], NotificationsService);
 //# sourceMappingURL=notifications.service.js.map

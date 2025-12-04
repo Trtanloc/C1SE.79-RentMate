@@ -15,7 +15,7 @@ class LoginDto {
 }
 exports.LoginDto = LoginDto;
 __decorate([
-    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.IsEmail)({ require_tld: false }),
     (0, class_validator_1.MaxLength)(100),
     __metadata("design:type", String)
 ], LoginDto.prototype, "email", void 0);
@@ -25,4 +25,9 @@ __decorate([
     (0, class_validator_1.MaxLength)(50),
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], LoginDto.prototype, "remember", void 0);
 //# sourceMappingURL=login.dto.js.map

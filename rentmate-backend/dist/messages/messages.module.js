@@ -12,12 +12,13 @@ const typeorm_1 = require("@nestjs/typeorm");
 const messages_service_1 = require("./messages.service");
 const messages_controller_1 = require("./messages.controller");
 const message_entity_1 = require("./entities/message.entity");
+const conversations_module_1 = require("../conversations/conversations.module");
 let MessagesModule = class MessagesModule {
 };
 exports.MessagesModule = MessagesModule;
 exports.MessagesModule = MessagesModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([message_entity_1.Message])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([message_entity_1.Message]), conversations_module_1.ConversationsModule],
         controllers: [messages_controller_1.MessagesController],
         providers: [messages_service_1.MessagesService],
         exports: [messages_service_1.MessagesService],

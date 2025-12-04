@@ -11,7 +11,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RegisterDto = void 0;
 const class_validator_1 = require("class-validator");
-const user_role_enum_1 = require("../../common/enums/user-role.enum");
 class RegisterDto {
 }
 exports.RegisterDto = RegisterDto;
@@ -26,7 +25,7 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "fullName", void 0);
 __decorate([
-    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.IsEmail)({ require_tld: false }),
     (0, class_validator_1.MaxLength)(100),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "email", void 0);
@@ -50,7 +49,7 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "phone", void 0);
 __decorate([
-    (0, class_validator_1.IsEnum)(user_role_enum_1.UserRole),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
-], RegisterDto.prototype, "role", void 0);
+], RegisterDto.prototype, "verificationId", void 0);
 //# sourceMappingURL=register.dto.js.map

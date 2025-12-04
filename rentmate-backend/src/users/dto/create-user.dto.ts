@@ -21,7 +21,7 @@ export class CreateUserDto {
   @MinLength(2)
   fullName: string;
 
-  @IsEmail()
+  @IsEmail({ require_tld: false })
   @MaxLength(100)
   email: string;
 
@@ -49,4 +49,12 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  emailVerifiedAt?: Date;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  facebookId?: string;
 }

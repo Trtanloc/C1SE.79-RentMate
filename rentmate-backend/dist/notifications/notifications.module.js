@@ -15,12 +15,13 @@ const notification_entity_1 = require("./entities/notification.entity");
 const user_entity_1 = require("../users/entities/user.entity");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const mailer_module_1 = require("../mail/mailer.module");
 let NotificationsModule = class NotificationsModule {
 };
 exports.NotificationsModule = NotificationsModule;
 exports.NotificationsModule = NotificationsModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([notification_entity_1.Notification, user_entity_1.User])],
+        imports: [typeorm_1.TypeOrmModule.forFeature([notification_entity_1.Notification, user_entity_1.User]), mailer_module_1.MailerModule],
         controllers: [notifications_controller_1.NotificationsController],
         providers: [notifications_service_1.NotificationsService, roles_guard_1.RolesGuard, jwt_auth_guard_1.JwtAuthGuard],
         exports: [notifications_service_1.NotificationsService],

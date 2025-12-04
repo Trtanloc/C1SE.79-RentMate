@@ -36,6 +36,34 @@ __decorate([
     __metadata("design:type", Number)
 ], Transaction.prototype, "amount", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ length: 3, default: 'VND' }),
+    __metadata("design:type", String)
+], Transaction.prototype, "currency", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 40, nullable: true }),
+    __metadata("design:type", String)
+], Transaction.prototype, "reference", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 40, default: 'manual' }),
+    __metadata("design:type", String)
+], Transaction.prototype, "paymentProvider", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 120, nullable: true }),
+    __metadata("design:type", String)
+], Transaction.prototype, "paymentIntentId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 500, nullable: true }),
+    __metadata("design:type", String)
+], Transaction.prototype, "paymentUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'payment_token_hash', length: 128, nullable: true }),
+    __metadata("design:type", String)
+], Transaction.prototype, "paymentTokenHash", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 40, default: 'bank-transfer' }),
+    __metadata("design:type", String)
+], Transaction.prototype, "method", void 0);
+__decorate([
     (0, typeorm_1.Column)({
         type: 'enum',
         enum: transaction_status_enum_1.TransactionStatus,
@@ -48,9 +76,17 @@ __decorate([
     __metadata("design:type", String)
 ], Transaction.prototype, "description", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Transaction.prototype, "notes", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: 'timestamp', nullable: true }),
     __metadata("design:type", Date)
 ], Transaction.prototype, "paidAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Transaction.prototype, "metadata", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

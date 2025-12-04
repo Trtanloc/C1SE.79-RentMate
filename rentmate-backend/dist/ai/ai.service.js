@@ -25,6 +25,7 @@ const transaction_entity_1 = require("../transactions/entities/transaction.entit
 const messages_service_1 = require("../messages/messages.service");
 const message_sender_enum_1 = require("../common/enums/message-sender.enum");
 const property_status_enum_1 = require("../common/enums/property-status.enum");
+const vietnam_cities_1 = require("../common/constants/vietnam-cities");
 let AiService = AiService_1 = class AiService {
     constructor(configService, dataSource, propertyRepository, contractRepository, transactionRepository, messagesService) {
         var _a;
@@ -45,7 +46,7 @@ let AiService = AiService_1 = class AiService {
             await this.dataSource.initialize();
         }
         if (!(options === null || options === void 0 ? void 0 : options.skipLog)) {
-            this.logger.log('✅ Connected to DB');
+            this.logger.log('Connected to DB');
         }
     }
     async handleChat(user, chatRequestDto) {
@@ -62,7 +63,7 @@ let AiService = AiService_1 = class AiService {
         });
         const contextResult = await this.buildDatabaseContext(trimmedMessage, user.id);
         const prompt = this.buildPrompt(trimmedMessage, user.fullName, contextResult === null || contextResult === void 0 ? void 0 : contextResult.context);
-        this.logger.log('✅ Sending data to Gemini API');
+        this.logger.log('Sending data to Gemini API');
         const reply = await this.requestGemini(prompt);
         await this.messagesService.logMessage({
             conversationId,
@@ -98,7 +99,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
         var _a, _b, _c, _d, _e, _f;
         const apiKey = this.configService.get('GEMINI_API_KEY');
         if (!apiKey) {
-            this.logger.error('Missing GEMINI_API_KEY – returning fallback answer.');
+            this.logger.error('Missing GEMINI_API_KEY - returning fallback answer.');
             return 'RentMate chưa được cấu hình khóa Gemini. Vui lòng liên hệ quản trị viên.';
         }
         try {
@@ -153,10 +154,10 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
         await this.ensureDatabaseConnection({ skipLog: true });
         try {
             const properties = await this.fetchCandidateProperties(filters);
-            this.logger.log(`? Retrieved ${properties.length} properties`);
+            this.logger.log(`Retrieved ${properties.length} properties`);
             if (!properties.length) {
-                return `Kh?ng c? b?t ??ng s?n ph? h?p${filters.city ? ` t?i ${filters.city}` : ''}${filters.maxBudget
-                    ? ` v?i ng?n s?ch ${this.formatCurrency(filters.maxBudget)}`
+                return `Không có bất động sản phù hợp${filters.city ? ` tại ${filters.city}` : ''}${filters.maxBudget
+                    ? ` với ngân sách ${this.formatCurrency(filters.maxBudget)}`
                     : ''}.`;
             }
             const ranked = this
@@ -165,24 +166,24 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
             const clusterSummary = this.describeClusterSummary(ranked);
             const lines = ranked.map((item, index) => {
                 var _a, _b;
-                const ownerName = (_b = (_a = item.property.owner) === null || _a === void 0 ? void 0 : _a.fullName) !== null && _b !== void 0 ? _b : 'Ch?a c?p nh?t';
-                return `${index + 1}. ${item.property.title} (${item.property.address}) ? ${this.formatCurrency(Number(item.property.price))}/th?ng, di?n t?ch ${item.property.area}m2, ch? nh?: ${ownerName}, ?i?m MCDM: ${item.score}`;
+                const ownerName = (_b = (_a = item.property.owner) === null || _a === void 0 ? void 0 : _a.fullName) !== null && _b !== void 0 ? _b : 'Chưa cập nhật';
+                return `${index + 1}. ${item.property.title} (${item.property.address}) • ${this.formatCurrency(Number(item.property.price))}/tháng, diện tích ${item.property.area}m2, chủ nhà: ${ownerName}, Điểm MCDM: ${item.score}`;
             });
             return [
-                'G?i ? b?t ??ng s?n t? c? s? d? li?u + MCDM:',
+                'Gợi ý bất động sản từ cơ sở dữ liệu + MCDM:',
                 ...lines,
                 clusterSummary,
             ].join('\n');
         }
         catch (error) {
             this.logger.error('Failed to gather property recommendations', error);
-            return 'Ch?ng t?i t?m th?i kh?ng truy v?n ???c d? li?u b?t ??ng s?n. Vui l?ng th? l?i sau.';
+            return 'Chúng tôi tạm thời không truy vấn được dữ liệu bất động sản. Vui lòng thử lại sau.';
         }
     }
     parseRecommendationFilters(message) {
         const normalized = message.toLowerCase();
-        const mentionsProperty = /(c?n h?|chung c?|apartment|nh? thu?|thu? nh?|property|b?t ??ng s?n)/.test(normalized);
-        const mentionsPrice = /(gi?|price|bao nhi?u|d??i|t?m|kho?ng|budget)/.test(normalized);
+        const mentionsProperty = /(can ho|căn hộ|chung cu|apartment|nha thue|thuê nhà|property|bất động sản)/.test(normalized);
+        const mentionsPrice = /(giá|price|bao nhiêu|dưới|tầm|khoảng|budget)/.test(normalized);
         const maxBudget = this.extractBudget(message);
         const city = this.extractCity(message);
         return {
@@ -210,7 +211,9 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
             });
         }
         if (filters.city) {
-            query.andWhere('(property.address LIKE :city OR property.title LIKE :city)', { city: `%${filters.city}%` });
+            query.andWhere('LOWER(property.city) = LOWER(:city)', {
+                city: filters.city,
+            });
         }
         return query.orderBy('property.price', 'ASC').limit(10).getMany();
     }
@@ -274,7 +277,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     }
     describeClusterSummary(ranked) {
         if (!ranked.length) {
-            return 'Kh?ng c? d? li?u ph?n c?m.';
+            return 'Không có dữ liệu phân cụm.';
         }
         const counts = {
             budget: 0,
@@ -285,14 +288,14 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
             counts[item.cluster] += 1;
         });
         const labels = {
-            budget: 'ti?t ki?m',
-            balanced: 'c?n b?ng',
-            premium: 'cao c?p',
+            budget: 'tiết kiệm',
+            balanced: 'cân bằng',
+            premium: 'cao cấp',
         };
         const summary = Object.keys(labels)
             .map((cluster) => `${labels[cluster]}: ${counts[cluster]}`)
-            .join(' ? ');
-        return `Ph?n c?m ng?n s?ch (MCDM): ${summary}`;
+            .join(' | ');
+        return `Phân cụm ngân sách (MCDM): ${summary}`;
     }
     async lookupLatestContractStatus(message, tenantId) {
         var _a, _b, _c, _d, _e, _f;
@@ -356,7 +359,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     }
     extractBudget(message) {
         var _a;
-        const budgetRegex = /(?:giá|dưới|under|tối đa|max|budget|khoảng)\D*(\d+(?:[.,]\d+)?)(?:\s*)(triệu|tr|million|tỷ|ty|nghìn|ngàn|k)?/i;
+        const budgetRegex = /(?:giá|dưới|under|tối đa|max|budget|khoảng)\D*(\d+(?:[.,]\d+)?)(?:\s*)(triệu|tr|million|tỷ|ty|nghìn|ngan|k)?/i;
         const match = message.match(budgetRegex);
         if (!match) {
             return undefined;
@@ -372,18 +375,23 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
         if (unit.includes('tỷ') || unit === 'ty') {
             return value * 1000000000;
         }
-        if (unit.includes('nghìn') || unit.includes('ngàn') || unit === 'k') {
+        if (unit.includes('nghìn') || unit.includes('ngan') || unit === 'k') {
             return value * 1000;
         }
         return value;
     }
     extractCity(message) {
+        var _a;
+        const directMatch = (0, vietnam_cities_1.detectVietnamCity)(message);
+        if (directMatch) {
+            return directMatch;
+        }
         const cityRegex = /(?:ở|tai|tại|in)\s+([\p{L}\s]+?)(?=[\.,!?]|$)/iu;
         const match = message.match(cityRegex);
         if (!match) {
             return undefined;
         }
-        return match[1].trim();
+        return (_a = (0, vietnam_cities_1.detectVietnamCity)(match[1])) !== null && _a !== void 0 ? _a : match[1].trim();
     }
     extractOwnerName(message) {
         const ownerRegex = /chủ nhà\s+([\p{L}\s]+?)(?=[\?,\.]|$)/iu;

@@ -2,6 +2,7 @@ import { Repository } from 'typeorm';
 import { Message } from './entities/message.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { MessageSender } from '../common/enums/message-sender.enum';
+import { ConversationsService } from '../conversations/conversations.service';
 type LogMessageInput = {
     conversationId: string;
     content: string;
@@ -11,7 +12,8 @@ type LogMessageInput = {
 };
 export declare class MessagesService {
     private readonly messagesRepository;
-    constructor(messagesRepository: Repository<Message>);
+    private readonly conversationsService;
+    constructor(messagesRepository: Repository<Message>, conversationsService: ConversationsService);
     findByConversationId(conversationId: string): Promise<Message[]>;
     create(createMessageDto: CreateMessageDto): Promise<{
         message: Message;
