@@ -47,6 +47,9 @@ export class PasswordResetsService {
     await this.passwordResetRepository.delete({ email: user.email });
 
     const token = this.generateToken();
+    if (!token) {
+      throw new BadRequestException('Could not generate reset token');
+    }
     const tokenHash = this.hashToken(token);
     const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
     const reset = this.passwordResetRepository.create({
@@ -55,10 +58,15 @@ export class PasswordResetsService {
       expiresAt,
     });
     await this.passwordResetRepository.save(reset);
-    await this.dispatchEmail(user.email, token, minutes);
+    const resetUrl = this.buildResetUrl(token);
+    await this.dispatchEmail(user.email, token, resetUrl, minutes);
   }
 
   async perform(dto: PerformResetDto) {
+    if (dto.password !== dto.confirmPassword) {
+      throw new BadRequestException('Password confirmation does not match');
+    }
+
     const tokenHash = this.hashToken(dto.token);
     const reset = await this.passwordResetRepository.findOne({
       where: {
@@ -83,6 +91,7 @@ export class PasswordResetsService {
     await this.usersService.update(user.id, { password: hashedPassword });
     reset.usedAt = new Date();
     await this.passwordResetRepository.save(reset);
+    await this.passwordResetRepository.delete({ email: reset.email });
     return { success: true };
   }
 
@@ -98,8 +107,12 @@ export class PasswordResetsService {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  private async dispatchEmail(email: string, token: string, minutes: number) {
-    const resetUrl = `${this.configService.get<string>('APP_BASE_URL', 'http://localhost:5173')}/reset-password?token=${token}`;
+  private async dispatchEmail(
+    email: string,
+    token: string,
+    resetUrl: string,
+    minutes: number,
+  ) {
     await this.mailerService.send({
       to: email,
       subject: 'Reset your RentMate password',
@@ -111,9 +124,22 @@ export class PasswordResetsService {
             <p style="margin:16px 0;"><a href="${resetUrl}" style="background:#2563eb;color:#ffffff;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700;">Reset password</a></p>
             <p style="margin:12px 0;color:#475569;">If the button doesn't work, copy this URL:</p>
             <p style="word-break:break-all;color:#0f172a;">${resetUrl}</p>
+            <p style="margin:12px 0;color:#475569;">Or paste this token in the reset form:</p>
+            <p style="padding:10px 12px;background:#f1f5f9;border-radius:8px;border:1px dashed #cbd5e1;word-break:break-all;color:#0f172a;">${token}</p>
           </div>
         </div>
       `,
     });
+  }
+
+  private buildResetUrl(token: string) {
+    const appBase = this.configService.get<string>(
+      'APP_BASE_URL',
+      'http://localhost:5173',
+    );
+    const normalized = appBase.endsWith('/')
+      ? appBase.slice(0, -1)
+      : appBase;
+    return `${normalized}/forgot-password?token=${encodeURIComponent(token)}`;
   }
 }

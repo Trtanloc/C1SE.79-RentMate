@@ -1,3 +1,4 @@
+import { Expose } from 'class-transformer';
 import {
   Column,
   CreateDateColumn,
@@ -27,6 +28,9 @@ export class Contract {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ nullable: true })
+  listingId?: number;
+
   @Column()
   propertyId: number;
 
@@ -47,6 +51,11 @@ export class Contract {
 
   @Column()
   ownerId: number;
+
+  @Expose()
+  get landlordId(): number {
+    return this.ownerId;
+  }
 
   @ManyToOne(() => User, (user) => user.contractsAsOwner, {
     onDelete: 'CASCADE',
@@ -78,6 +87,12 @@ export class Contract {
 
   @Column({ type: 'timestamp', nullable: true })
   signedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  contractHtml?: string;
+
+  @Column({ length: 300, nullable: true })
+  contractPdfUrl?: string;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -58,16 +58,7 @@ let AuthService = class AuthService {
             emailVerifiedAt: new Date(),
         });
         await this.verificationCodesService.markAsUsed(registerDto.verificationId);
-        const payload = {
-            sub: user.id,
-            email: user.email,
-            role: user.role,
-        };
-        const token = await this.jwtService.signAsync(payload);
-        return {
-            token,
-            user: sanitizeUser(user),
-        };
+        return this.issueToken(user, true);
     }
     async validateUser(email, password) {
         const user = await this.usersService.findByEmail(email);
@@ -82,22 +73,69 @@ let AuthService = class AuthService {
     }
     async login(loginDto) {
         const user = await this.validateUser(loginDto.email, loginDto.password);
-        const payload = {
+        return this.issueToken(user, loginDto.remember);
+    }
+    async logout() {
+        return { message: 'Logout successful' };
+    }
+    buildFacebookAuthUrl(params = {}) {
+        const appId = this.configService.get('FACEBOOK_APP_ID');
+        if (!appId) {
+            throw new common_1.UnauthorizedException('Facebook login is not configured');
+        }
+        const redirectUri = this.getFacebookRedirectUri();
+        const url = new URL('https://www.facebook.com/v18.0/dialog/oauth');
+        url.searchParams.set('client_id', appId);
+        url.searchParams.set('redirect_uri', redirectUri);
+        url.searchParams.set('scope', 'email,public_profile');
+        const encodedState = this.encodeState(params.state, params.returnUrl);
+        if (encodedState) {
+            url.searchParams.set('state', encodedState);
+        }
+        return url.toString();
+    }
+    async handleFacebookCallback(code, rawState) {
+        if (!code) {
+            throw new common_1.UnauthorizedException('Missing Facebook authorization code');
+        }
+        const accessToken = await this.exchangeFacebookCode(code);
+        const profile = await this.fetchFacebookProfile(accessToken);
+        const user = await this.upsertFacebookUser(profile);
+        return this.issueToken(user, true);
+    }
+    buildFacebookSuccessRedirect(token, expiresAt, rawState) {
+        const frontendBase = this.configService.get('APP_BASE_URL') ||
+            'http://localhost:5173';
+        const normalized = frontendBase.endsWith('/')
+            ? frontendBase.slice(0, -1)
+            : frontendBase;
+        const parsedState = this.parseState(rawState);
+        const params = new URLSearchParams({ token });
+        if (expiresAt) {
+            params.set('expiresAt', expiresAt);
+        }
+        if (parsedState === null || parsedState === void 0 ? void 0 : parsedState.returnUrl) {
+            params.set('returnUrl', parsedState.returnUrl);
+        }
+        return `${normalized}/auth/success?${params.toString()}`;
+    }
+    async issueToken(user, remember = true) {
+        const payload = this.buildJwtPayload(user);
+        const token = await this.jwtService.signAsync(payload, {
+            expiresIn: this.getExpiry(remember),
+        });
+        return {
+            token,
+            expiresAt: this.resolveExpiresAt(remember),
+            user: sanitizeUser(user),
+        };
+    }
+    buildJwtPayload(user) {
+        return {
             sub: user.id,
             email: user.email,
             role: user.role,
         };
-        const token = await this.jwtService.signAsync(payload, {
-            expiresIn: this.getExpiry(loginDto.remember),
-        });
-        return {
-            token,
-            expiresAt: this.resolveExpiresAt(loginDto.remember),
-            user: sanitizeUser(user),
-        };
-    }
-    async logout() {
-        return { message: 'Logout successful' };
     }
     getExpiry(remember) {
         if (remember) {
@@ -111,29 +149,98 @@ let AuthService = class AuthService {
         expires.setDate(expires.getDate() + days);
         return expires.toISOString();
     }
-    async loginWithFacebook(dto) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
-        const graphBase = (_a = this.configService.get('FACEBOOK_GRAPH_URL')) !== null && _a !== void 0 ? _a : 'https://graph.facebook.com';
-        const fields = 'id,name,email,picture';
-        const requestUrl = `${graphBase}/me?fields=${fields}&access_token=${encodeURIComponent(dto.accessToken)}`;
-        let profile;
+    getFacebookRedirectUri() {
+        const explicit = this.configService.get('FACEBOOK_REDIRECT_URI');
+        if (explicit) {
+            return explicit;
+        }
+        const apiBase = this.configService.get('API_BASE_URL') ||
+            `http://localhost:${this.configService.get('PORT') || 3000}`;
+        const normalizedBase = apiBase.endsWith('/')
+            ? apiBase.slice(0, -1)
+            : apiBase;
+        const apiRoot = normalizedBase.endsWith('/api')
+            ? normalizedBase
+            : `${normalizedBase}/api`;
+        return `${apiRoot}/auth/facebook/callback`;
+    }
+    encodeState(state, returnUrl) {
+        const payload = {};
+        if (state) {
+            payload.payload = state;
+        }
+        if (returnUrl) {
+            payload.returnUrl = returnUrl;
+        }
+        if (Object.keys(payload).length === 0) {
+            return undefined;
+        }
+        return Buffer.from(JSON.stringify(payload)).toString('base64url');
+    }
+    parseState(raw) {
+        if (!raw)
+            return null;
         try {
-            const response = await axios_1.default.get(requestUrl, { timeout: 5000 });
-            profile = response.data;
+            const decoded = Buffer.from(raw, 'base64url').toString('utf8');
+            const parsed = JSON.parse(decoded);
+            return parsed;
+        }
+        catch (_a) {
+            return null;
+        }
+    }
+    async exchangeFacebookCode(code) {
+        var _a, _b, _c, _d;
+        const appId = this.configService.get('FACEBOOK_APP_ID');
+        const appSecret = this.configService.get('FACEBOOK_APP_SECRET');
+        if (!appId || !appSecret) {
+            throw new common_1.UnauthorizedException('Facebook login is not configured');
+        }
+        const graphBase = (_a = this.configService.get('FACEBOOK_GRAPH_URL')) !== null && _a !== void 0 ? _a : 'https://graph.facebook.com';
+        const redirectUri = this.getFacebookRedirectUri();
+        const tokenUrl = `${graphBase}/v18.0/oauth/access_token`;
+        try {
+            const { data } = await axios_1.default.get(tokenUrl, {
+                params: {
+                    client_id: appId,
+                    client_secret: appSecret,
+                    redirect_uri: redirectUri,
+                    code,
+                },
+                timeout: 5000,
+            });
+            if (!(data === null || data === void 0 ? void 0 : data.access_token)) {
+                throw new common_1.UnauthorizedException('Facebook access token missing');
+            }
+            return data.access_token;
         }
         catch (error) {
             throw new common_1.UnauthorizedException(((_d = (_c = (_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error) === null || _d === void 0 ? void 0 : _d.message) ||
-                'Unable to verify Facebook access token');
+                'Unable to exchange Facebook authorization code');
         }
-        if (!(profile === null || profile === void 0 ? void 0 : profile.id)) {
-            throw new common_1.UnauthorizedException('Invalid Facebook profile');
+    }
+    async fetchFacebookProfile(accessToken) {
+        var _a, _b, _c, _d, _e;
+        const graphBase = (_a = this.configService.get('FACEBOOK_GRAPH_URL')) !== null && _a !== void 0 ? _a : 'https://graph.facebook.com';
+        const fields = 'id,name,email,picture';
+        const requestUrl = `${graphBase}/me?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`;
+        try {
+            const response = await axios_1.default.get(requestUrl, { timeout: 5000 });
+            if (!((_b = response.data) === null || _b === void 0 ? void 0 : _b.id)) {
+                throw new common_1.UnauthorizedException('Invalid Facebook profile response');
+            }
+            return response.data;
         }
-        const email = (_f = (_e = profile.email) === null || _e === void 0 ? void 0 : _e.toLowerCase()) !== null && _f !== void 0 ? _f : `fb-${profile.id}@facebook.com`;
+        catch (error) {
+            throw new common_1.UnauthorizedException(((_e = (_d = (_c = error === null || error === void 0 ? void 0 : error.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.error) === null || _e === void 0 ? void 0 : _e.message) ||
+                'Unable to fetch Facebook profile');
+        }
+    }
+    async upsertFacebookUser(profile) {
+        var _a, _b, _c, _d, _e, _f;
+        const email = (_b = (_a = profile.email) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : `fb-${profile.id}@facebook.com`;
         const fullName = profile.name || 'Facebook User';
-        const avatarUrl = dto.avatarUrl ||
-            ((_h = (_g = profile.picture) === null || _g === void 0 ? void 0 : _g.data) === null || _h === void 0 ? void 0 : _h.url) ||
-            ((_j = profile.picture) === null || _j === void 0 ? void 0 : _j.url) ||
-            undefined;
+        const avatarUrl = ((_d = (_c = profile.picture) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.url) || ((_e = profile.picture) === null || _e === void 0 ? void 0 : _e.url) || undefined;
         let user = await this.usersService.findByFacebookId(profile.id);
         if (!user) {
             user = await this.usersService.findByEmail(email);
@@ -155,23 +262,11 @@ let AuthService = class AuthService {
             await this.usersService.update(user.id, {
                 facebookId: profile.id,
                 avatarUrl: avatarUrl !== null && avatarUrl !== void 0 ? avatarUrl : user.avatarUrl,
-                emailVerifiedAt: (_k = user.emailVerifiedAt) !== null && _k !== void 0 ? _k : new Date(),
+                emailVerifiedAt: (_f = user.emailVerifiedAt) !== null && _f !== void 0 ? _f : new Date(),
             });
             user = await this.usersService.findById(user.id);
         }
-        const payload = {
-            sub: user.id,
-            email: user.email,
-            role: user.role,
-        };
-        const token = await this.jwtService.signAsync(payload, {
-            expiresIn: this.getExpiry(true),
-        });
-        return {
-            token,
-            expiresAt: this.resolveExpiresAt(true),
-            user: sanitizeUser(user),
-        };
+        return user;
     }
 };
 exports.AuthService = AuthService;

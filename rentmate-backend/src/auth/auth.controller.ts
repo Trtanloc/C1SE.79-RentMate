@@ -1,4 +1,12 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -9,7 +17,7 @@ import { VerifyCodeDto } from '../verification-codes/dto/verify-code.dto';
 import { PasswordResetsService } from '../password-resets/password-resets.service';
 import { RequestResetDto } from '../password-resets/dto/request-reset.dto';
 import { PerformResetDto } from '../password-resets/dto/perform-reset.dto';
-import { FacebookLoginDto } from './dto/facebook-login.dto';
+import { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -66,14 +74,30 @@ export class AuthController {
     };
   }
 
-  @Post('login/facebook')
-  async loginWithFacebook(@Body() dto: FacebookLoginDto) {
-    const result = await this.authService.loginWithFacebook(dto);
-    return {
-      success: true,
-      message: 'Facebook login successful',
-      data: result,
-    };
+  @Get('facebook')
+  async redirectToFacebook(
+    @Res() res: Response,
+    @Query('state') state?: string,
+    @Query('returnUrl') returnUrl?: string,
+  ) {
+    const url = this.authService.buildFacebookAuthUrl({ state, returnUrl });
+    return res.redirect(url);
+  }
+
+  @Get('facebook/callback')
+  async handleFacebookCallback(
+    @Query('code') code: string,
+    @Query('state') state = '',
+    @Res() res: Response,
+  ) {
+    const { token, expiresAt } =
+      await this.authService.handleFacebookCallback(code, state);
+    const redirectUrl = this.authService.buildFacebookSuccessRedirect(
+      token,
+      expiresAt,
+      state,
+    );
+    return res.redirect(redirectUrl);
   }
 
   @Post('forgot-password')

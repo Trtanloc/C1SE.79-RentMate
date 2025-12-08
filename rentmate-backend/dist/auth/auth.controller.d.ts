@@ -7,7 +7,7 @@ import { VerifyCodeDto } from '../verification-codes/dto/verify-code.dto';
 import { PasswordResetsService } from '../password-resets/password-resets.service';
 import { RequestResetDto } from '../password-resets/dto/request-reset.dto';
 import { PerformResetDto } from '../password-resets/dto/perform-reset.dto';
-import { FacebookLoginDto } from './dto/facebook-login.dto';
+import { Response } from 'express';
 export declare class AuthController {
     private readonly authService;
     private readonly verificationCodesService;
@@ -34,6 +34,7 @@ export declare class AuthController {
         message: string;
         data: {
             token: string;
+            expiresAt: string;
             user: {
                 id: number;
                 fullName: string;
@@ -82,33 +83,8 @@ export declare class AuthController {
             };
         };
     }>;
-    loginWithFacebook(dto: FacebookLoginDto): Promise<{
-        success: boolean;
-        message: string;
-        data: {
-            token: string;
-            expiresAt: string;
-            user: {
-                id: number;
-                fullName: string;
-                email: string;
-                phone?: string;
-                avatarUrl?: string;
-                bio?: string;
-                facebookId?: string;
-                role: import("../common/enums/user-role.enum").UserRole;
-                isActive: boolean;
-                emailVerifiedAt?: Date;
-                createdAt: Date;
-                updatedAt: Date;
-                properties: import("../properties/entities/property.entity").Property[];
-                contractsAsTenant: import("../contracts/entities/contract.entity").Contract[];
-                contractsAsOwner: import("../contracts/entities/contract.entity").Contract[];
-                notifications: import("../notifications/entities/notification.entity").Notification[];
-                landlordApplications: import("../landlord-applications/entities/landlord-application.entity").LandlordApplication[];
-            };
-        };
-    }>;
+    redirectToFacebook(res: Response, state?: string, returnUrl?: string): Promise<void>;
+    handleFacebookCallback(code: string, state: string, res: Response): Promise<void>;
     forgotPassword(dto: RequestResetDto): Promise<{
         success: boolean;
         message: string;

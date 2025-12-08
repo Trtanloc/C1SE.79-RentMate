@@ -3,12 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ListUsersDto } from './dto/list-users.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserRole } from '../common/enums/user-role.enum';
 import { PropertyStatus } from '../common/enums/property-status.enum';
 import { ContractStatus } from '../common/enums/contract-status.enum';
@@ -113,6 +115,31 @@ export class UsersService {
   async remove(id: number): Promise<void> {
     const user = await this.findOneOrFail(id);
     await this.usersRepository.remove(user);
+  }
+
+  async changePassword(id: number, dto: ChangePasswordDto): Promise<void> {
+    const user = await this.findOneOrFail(id);
+
+    if (dto.newPassword !== dto.confirmNewPassword) {
+      throw new BadRequestException('Password confirmation does not match');
+    }
+
+    const isCurrentValid = await bcrypt.compare(
+      dto.currentPassword,
+      user.password,
+    );
+    if (!isCurrentValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    if (dto.newPassword === dto.currentPassword) {
+      throw new BadRequestException(
+        'New password must be different from current password',
+      );
+    }
+
+    const hashed = await bcrypt.hash(dto.newPassword, 10);
+    await this.usersRepository.update(id, { password: hashed });
   }
 
   async getHighlights(limit = 6) {

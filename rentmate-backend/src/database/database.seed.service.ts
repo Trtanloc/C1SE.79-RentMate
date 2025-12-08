@@ -19,6 +19,7 @@ import { NotificationType } from '../common/enums/notification-type.enum';
 import { Message } from '../messages/entities/message.entity';
 import { MessageSender } from '../common/enums/message-sender.enum';
 import { Testimonial } from '../testimonials/entities/testimonial.entity';
+import { buildContractHtml } from '../contracts/templates/contract-template';
 
 type SeedProperty = {
   title: string;
@@ -79,7 +80,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
     const tenants = await this.ensureTenantAccounts(defaultPasswordHash);
 
     const properties = await this.ensureProperties(landlords);
-    const contracts = await this.ensureContracts(properties, tenants);
+    const contracts = await this.ensureContracts(properties, tenants, landlords);
     await this.ensureTransactions(contracts);
     await this.ensureNotifications(tenants);
     await this.ensureMessages(tenants);
@@ -228,7 +229,11 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
     return this.propertiesRepository.save(propertyEntities);
   }
 
-  private async ensureContracts(properties: Property[], tenants: User[]) {
+  private async ensureContracts(
+    properties: Property[],
+    tenants: User[],
+    landlords: User[],
+  ) {
     const existingContracts = await this.contractsRepository.find();
     if (existingContracts.length > 0) {
       return existingContracts;
@@ -240,20 +245,55 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
 
     const contractEntities = properties.slice(0, 25).map((property, index) => {
       const tenant = tenants[index % tenants.length];
+      const landlord =
+        landlords.find((item) => item.id === property.ownerId) ||
+        landlords[index % landlords.length];
+      const contractNumber = `RM-SEED-${index + 1}`;
+      const startDate = '2025-01-15';
+      const endDate = '2025-12-31';
+
       return this.contractsRepository.create({
-        contractNumber: `RM-SEED-${index + 1}`,
+        contractNumber,
         title: `Rental contract for ${property.title}`,
         notes: 'Seeded contract for demo data.',
         propertyId: property.id,
+        listingId: property.id,
         tenantId: tenant.id,
         ownerId: property.ownerId,
         monthlyRent: property.price,
         depositAmount: Number(property.price) * 2,
         autoRenew: index % 2 === 0,
         status: ContractStatus.Active,
-        startDate: '2025-01-15',
-        endDate: '2025-12-31',
+        startDate,
+        endDate,
         signedAt: new Date(),
+        contractHtml: buildContractHtml({
+          contractNumber,
+          landlord: {
+            name: landlord?.fullName ?? 'Chủ nhà',
+            email: landlord?.email,
+            phone: landlord?.phone,
+          },
+          tenant: {
+            name: tenant.fullName,
+            email: tenant.email,
+            phone: tenant.phone,
+          },
+          listing: {
+            title: property.title,
+            address: property.address,
+            area: property.area,
+            bedrooms: property.bedrooms,
+            bathrooms: property.bathrooms,
+            price: property.price ? Number(property.price) : undefined,
+          },
+          financial: {
+            depositAmount: Number(property.price) * 2,
+            monthlyRent: property.price ? Number(property.price) : undefined,
+            startDate,
+            endDate,
+          },
+        }),
       });
     });
 

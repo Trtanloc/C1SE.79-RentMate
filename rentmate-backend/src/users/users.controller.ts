@@ -12,12 +12,14 @@ import {
   UseGuards,
   ForbiddenException,
   DefaultValuePipe,
+  BadRequestException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Request } from 'express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -98,8 +100,14 @@ export class UsersController {
     }
 
     const payload: UpdateUserDto = { ...updateUserDto };
-    if (updateUserDto.password) {
-      payload.password = await bcrypt.hash(updateUserDto.password, 10);
+    if (typeof updateUserDto.password !== 'undefined') {
+      if (actor.role === UserRole.Admin && actor.id !== id) {
+        payload.password = await bcrypt.hash(updateUserDto.password, 10);
+      } else {
+        throw new BadRequestException(
+          'Use the change password form to update your password',
+        );
+      }
     }
     const user = await this.usersService.update(id, payload);
     return {
@@ -119,6 +127,24 @@ export class UsersController {
     return {
       success: true,
       message: 'User deleted successfully',
+    };
+  }
+
+  @Put(':id/password')
+  async changePassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
+  ) {
+    const actor = req.user as User;
+    if (actor.id !== id) {
+      throw new ForbiddenException('You can only change your own password');
+    }
+
+    await this.usersService.changePassword(id, dto);
+    return {
+      success: true,
+      message: 'Password updated successfully',
     };
   }
 

@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
+const bcrypt = require("bcrypt");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const user_entity_1 = require("./entities/user.entity");
@@ -92,6 +93,21 @@ let UsersService = class UsersService {
     async remove(id) {
         const user = await this.findOneOrFail(id);
         await this.usersRepository.remove(user);
+    }
+    async changePassword(id, dto) {
+        const user = await this.findOneOrFail(id);
+        if (dto.newPassword !== dto.confirmNewPassword) {
+            throw new common_1.BadRequestException('Password confirmation does not match');
+        }
+        const isCurrentValid = await bcrypt.compare(dto.currentPassword, user.password);
+        if (!isCurrentValid) {
+            throw new common_1.BadRequestException('Current password is incorrect');
+        }
+        if (dto.newPassword === dto.currentPassword) {
+            throw new common_1.BadRequestException('New password must be different from current password');
+        }
+        const hashed = await bcrypt.hash(dto.newPassword, 10);
+        await this.usersRepository.update(id, { password: hashed });
     }
     async getHighlights(limit = 6) {
         const safeLimit = Math.min(Math.max(limit, 1), 50);

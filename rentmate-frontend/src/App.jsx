@@ -17,6 +17,8 @@ import ForgotPasswordPage from './pages/ForgotPassword.jsx';
 import PaymentsPage from './pages/Payments.jsx';
 import MessagesPage from './pages/Messages.jsx';
 import ContractsPage from './pages/Contracts.jsx';
+import ContractPreviewPage from './pages/ContractPreview.jsx';
+import AuthSuccess from './pages/AuthSuccess.jsx';
 import { UserRole } from './utils/constants.js';
 
 const App = () => {
@@ -30,6 +32,7 @@ const App = () => {
           <Route path="/properties/:id" element={<PropertyDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/auth/success" element={<AuthSuccess />} />
           <Route
             path="/dashboard"
             element={
@@ -59,6 +62,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <PaymentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contracts/:id/preview"
+            element={
+              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
+                <ContractPreviewPage />
               </ProtectedRoute>
             }
           />

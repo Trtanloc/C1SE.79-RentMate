@@ -15,6 +15,7 @@ import {
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
+import { CreateAutoContractDto } from './dto/create-auto-contract.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -46,14 +47,38 @@ export class ContractsController {
     return { success: true, data };
   }
 
-  @Get(':id')
-  async findOne(
+  @Post('create')
+  async createFromListing(
+    @Req() req: Request,
+    @Body() body: CreateAutoContractDto,
+  ) {
+    const user = req.user as User;
+    const data = await this.contractsService.createFromListing(user.id, body);
+    return {
+      success: true,
+      message: 'Contract created successfully',
+      data,
+    };
+  }
+
+  @Get('user/:id')
+  async findByUser(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: Request,
   ) {
-    const contract = await this.contractsService.findOne(id);
-    this.ensureAccess(req.user as User, contract);
-    return { success: true, data: contract };
+    const user = req.user as User;
+    if (
+      user.role !== UserRole.Admin &&
+      user.role !== UserRole.Manager &&
+      user.id !== id
+    ) {
+      throw new ForbiddenException('Access denied');
+    }
+    const data = await this.contractsService.findForActor({
+      id,
+      role: UserRole.Tenant,
+    });
+    return { success: true, data };
   }
 
   @Get(':id/pdf')
@@ -66,8 +91,21 @@ export class ContractsController {
     this.ensureAccess(req.user as User, contract);
     const buffer = await this.contractsService.generatePdf(id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="contract-${id}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="contract-${contract.contractNumber || id}.pdf"`,
+    );
     res.send(buffer);
+  }
+
+  @Get(':id')
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request,
+  ) {
+    const contract = await this.contractsService.findOne(id);
+    this.ensureAccess(req.user as User, contract);
+    return { success: true, data: contract };
   }
 
   @Roles(UserRole.Admin, UserRole.Manager, UserRole.Landlord)

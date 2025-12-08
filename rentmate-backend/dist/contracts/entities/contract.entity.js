@@ -10,12 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Contract = void 0;
+const class_transformer_1 = require("class-transformer");
 const typeorm_1 = require("typeorm");
 const property_entity_1 = require("../../properties/entities/property.entity");
 const user_entity_1 = require("../../users/entities/user.entity");
 const contract_status_enum_1 = require("../../common/enums/contract-status.enum");
 const transaction_entity_1 = require("../../transactions/entities/transaction.entity");
 let Contract = class Contract {
+    get landlordId() {
+        return this.ownerId;
+    }
 };
 exports.Contract = Contract;
 __decorate([
@@ -34,6 +38,10 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], Contract.prototype, "notes", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", Number)
+], Contract.prototype, "listingId", void 0);
 __decorate([
     (0, typeorm_1.Column)(),
     __metadata("design:type", Number)
@@ -60,6 +68,11 @@ __decorate([
     (0, typeorm_1.Column)(),
     __metadata("design:type", Number)
 ], Contract.prototype, "ownerId", void 0);
+__decorate([
+    (0, class_transformer_1.Expose)(),
+    __metadata("design:type", Number),
+    __metadata("design:paramtypes", [])
+], Contract.prototype, "landlordId", null);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.contractsAsOwner, {
         onDelete: 'CASCADE',
@@ -99,6 +112,14 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'timestamp', nullable: true }),
     __metadata("design:type", Date)
 ], Contract.prototype, "signedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Contract.prototype, "contractHtml", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ length: 300, nullable: true }),
+    __metadata("design:type", String)
+], Contract.prototype, "contractPdfUrl", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

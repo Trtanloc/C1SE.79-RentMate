@@ -1,14 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { promises as fs } from 'fs';
+import { join } from 'path';
+import puppeteer from 'puppeteer';
 import { Repository } from 'typeorm';
 import { Contract } from './entities/contract.entity';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { CreateAutoContractDto } from './dto/create-auto-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { Property } from '../properties/entities/property.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
-// Lazy import to avoid crashing app if pdfkit is not installed; resolved at runtime in generatePdf.
-let PDFDocument: any;
+import { ContractStatus } from '../common/enums/contract-status.enum';
+import {
+  buildContractHtml,
+  ContractTemplateData,
+} from './templates/contract-template';
 
 type Actor = { id: number; role: UserRole };
 
@@ -26,6 +37,7 @@ export class ContractsService {
   async create(createContractDto: CreateContractDto) {
     const property = await this.propertiesRepository.findOne({
       where: { id: createContractDto.propertyId },
+      relations: ['owner'],
     });
     if (!property) {
       throw new NotFoundException(
@@ -43,14 +55,105 @@ export class ContractsService {
     }
 
     const ownerId = createContractDto.ownerId ?? property.ownerId;
+    const landlord =
+      property.owner ||
+      (await this.usersRepository.findOne({ where: { id: ownerId } }));
+    if (!landlord) {
+      throw new NotFoundException(`Landlord ${ownerId} not found`);
+    }
+
+    const contractNumber = await this.generateContractNumber();
+    const contractHtml = this.buildHtmlFromEntities(
+      {
+        ...createContractDto,
+        ownerId,
+        contractNumber,
+        listingId: property.id,
+      } as Contract,
+      property,
+      tenant,
+      landlord,
+    );
 
     const contract = this.contractsRepository.create({
       ...createContractDto,
+      listingId: property.id,
       ownerId,
-      contractNumber: await this.generateContractNumber(),
+      contractNumber,
+      contractHtml,
     });
 
-    return this.contractsRepository.save(contract);
+    const saved = await this.contractsRepository.save(contract);
+    return this.findOne(saved.id);
+  }
+
+  async createFromListing(
+    tenantId: number,
+    dto: CreateAutoContractDto,
+  ): Promise<Contract> {
+    const property = await this.propertiesRepository.findOne({
+      where: { id: dto.listingId },
+      relations: ['owner'],
+    });
+    if (!property) {
+      throw new NotFoundException(`Listing ${dto.listingId} not found`);
+    }
+
+    const tenant = await this.usersRepository.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const landlord =
+      property.owner ||
+      (await this.usersRepository.findOne({ where: { id: property.ownerId } }));
+    if (!landlord) {
+      throw new NotFoundException(`Landlord ${property.ownerId} not found`);
+    }
+
+    const startDate =
+      dto.startDate ||
+      property.availableFrom ||
+      new Date().toISOString().slice(0, 10);
+    const endDate =
+      dto.endDate ||
+      (() => {
+        const start = new Date(startDate);
+        start.setFullYear(start.getFullYear() + 1);
+        return start.toISOString().slice(0, 10);
+      })();
+
+    const monthlyRent =
+      dto.monthlyRent ?? (property.price ? Number(property.price) : 0);
+    const depositAmount =
+      dto.depositAmount ?? (property.price ? Number(property.price) * 2 : 0);
+
+    const contractNumber = await this.generateContractNumber();
+    const contractPayload: Partial<Contract> = {
+      contractNumber,
+      title: `Hợp đồng thuê ${property.title}`,
+      notes: dto.notes,
+      propertyId: property.id,
+      listingId: property.id,
+      tenantId: tenant.id,
+      ownerId: landlord.id,
+      monthlyRent,
+      depositAmount,
+      autoRenew: false,
+      status: ContractStatus.Draft,
+      startDate,
+      endDate,
+    };
+
+    const contractHtml = this.buildHtmlFromEntities(contractPayload, property, tenant, landlord);
+
+    const entity = this.contractsRepository.create({
+      ...contractPayload,
+      contractHtml,
+    });
+
+    const saved = await this.contractsRepository.save(entity);
+    return this.findOne(saved.id);
   }
 
   findAll() {
@@ -91,14 +194,37 @@ export class ContractsService {
   }
 
   async update(id: number, updateContractDto: UpdateContractDto) {
-    const preload = await this.contractsRepository.preload({
-      id,
-      ...updateContractDto,
-    });
-    if (!preload) {
-      throw new NotFoundException(`Contract ${id} not found`);
+    const existing = await this.findOne(id);
+    const merged = this.contractsRepository.merge(existing, updateContractDto);
+    merged.listingId = merged.propertyId;
+
+    const property =
+      merged.property ||
+      (await this.propertiesRepository.findOne({
+        where: { id: merged.propertyId },
+        relations: ['owner'],
+      }));
+    const tenant =
+      merged.tenant ||
+      (await this.usersRepository.findOne({
+        where: { id: merged.tenantId },
+      }));
+    const landlord =
+      merged.owner ||
+      (await this.usersRepository.findOne({ where: { id: merged.ownerId } }));
+
+    if (!property || !tenant || !landlord) {
+      throw new BadRequestException('Unable to refresh contract parties');
     }
-    return this.contractsRepository.save(preload);
+
+    merged.contractHtml = this.buildHtmlFromEntities(
+      merged,
+      property,
+      tenant,
+      landlord,
+    );
+    const saved = await this.contractsRepository.save(merged);
+    return this.findOne(saved.id);
   }
 
   async remove(id: number) {
@@ -125,49 +251,121 @@ export class ContractsService {
   }
 
   async generatePdf(contractId: number): Promise<Buffer> {
-    if (!PDFDocument) {
-      try {
-        // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
-        PDFDocument = require('pdfkit');
-      } catch (error) {
-        throw new Error(
-          'pdfkit is not installed. Run "npm install pdfkit" in rentmate-backend.',
-        );
-      }
-    }
-
     const contract = await this.findOne(contractId);
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const chunks: Buffer[] = [];
+    const html = await this.ensureHtml(contract);
+    const buffer = await this.renderHtmlToPdf(html);
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('error', () => {
-      // swallow errors to avoid crashing caller
-    });
-
-    doc.fontSize(20).text('RentMate Lease Agreement', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Contract #: ${contract.contractNumber}`);
-    doc.text(`Property: ${contract.property?.title ?? ''}`);
-    doc.text(`Address: ${contract.property?.address ?? ''}`);
-    doc.text(
-      `Tenant: ${contract.tenant?.fullName ?? ''} (${contract.tenant?.email})`,
-    );
-    doc.text(
-      `Landlord: ${contract.owner?.fullName ?? ''} (${contract.owner?.email})`,
-    );
-    doc.text(`Monthly Rent: ${contract.monthlyRent}`);
-    doc.text(`Deposit: ${contract.depositAmount}`);
-    doc.text(`Start: ${contract.startDate ?? '--'}`);
-    doc.text(`End: ${contract.endDate ?? '--'}`);
-    if (contract.notes) {
-      doc.moveDown().text('Notes:');
-      doc.text(contract.notes);
+    await this.writePdfToDisk(contractId, buffer);
+    const pdfUrl = this.resolvePdfUrl(contractId);
+    if (!contract.contractPdfUrl || contract.contractPdfUrl !== pdfUrl) {
+      await this.contractsRepository.update(contractId, {
+        contractPdfUrl: pdfUrl,
+        contractHtml: html,
+      });
     }
-    doc.end();
 
-    return await new Promise<Buffer>((resolve) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+    return buffer;
+  }
+
+  private buildHtmlFromEntities(
+    contract: Partial<Contract>,
+    property: Property,
+    tenant: User,
+    landlord: User,
+  ) {
+    const template: ContractTemplateData = {
+      contractNumber: contract.contractNumber,
+      landlord: {
+        name: landlord.fullName,
+        email: landlord.email,
+        phone: landlord.phone,
+      },
+      tenant: {
+        name: tenant.fullName,
+        email: tenant.email,
+        phone: tenant.phone,
+      },
+      listing: {
+        title: property.title,
+        address: property.address,
+        area: property.area,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        price: property.price ? Number(property.price) : undefined,
+      },
+      financial: {
+        depositAmount: contract.depositAmount,
+        monthlyRent: contract.monthlyRent,
+        startDate: contract.startDate,
+        endDate: contract.endDate,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+    return buildContractHtml(template);
+  }
+
+  private async ensureHtml(contract: Contract): Promise<string> {
+    if (contract.contractHtml) {
+      return contract.contractHtml;
+    }
+    const property =
+      contract.property ||
+      (await this.propertiesRepository.findOne({
+        where: { id: contract.propertyId },
+        relations: ['owner'],
+      }));
+    const tenant =
+      contract.tenant ||
+      (await this.usersRepository.findOne({
+        where: { id: contract.tenantId },
+      }));
+    const landlord =
+      contract.owner ||
+      (await this.usersRepository.findOne({
+        where: { id: contract.ownerId },
+      }));
+
+    if (!property || !tenant || !landlord) {
+      throw new BadRequestException('Missing data to render contract template');
+    }
+    const html = this.buildHtmlFromEntities(contract, property, tenant, landlord);
+    await this.contractsRepository.update(contract.id, { contractHtml: html });
+    return html;
+  }
+
+  private async renderHtmlToPdf(html: string): Promise<Buffer> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.emulateMediaType('screen');
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '12mm',
+          bottom: '14mm',
+          left: '12mm',
+          right: '12mm',
+        },
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async writePdfToDisk(contractId: number, buffer: Buffer) {
+    const dir = join(process.cwd(), 'uploads', 'contracts');
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = join(dir, `contract-${contractId}.pdf`);
+    await fs.writeFile(filePath, buffer);
+  }
+
+  private resolvePdfUrl(contractId: number) {
+    return `/uploads/contracts/contract-${contractId}.pdf`;
   }
 }

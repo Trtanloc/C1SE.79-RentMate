@@ -7,11 +7,13 @@ export declare class Contract {
     contractNumber: string;
     title: string;
     notes?: string;
+    listingId?: number;
     propertyId: number;
     property: Property;
     tenantId: number;
     tenant: User;
     ownerId: number;
+    get landlordId(): number;
     owner: User;
     monthlyRent: number;
     depositAmount: number;
@@ -20,6 +22,8 @@ export declare class Contract {
     startDate?: string;
     endDate?: string;
     signedAt?: Date;
+    contractHtml?: string;
+    contractPdfUrl?: string;
     createdAt: Date;
     updatedAt: Date;
     transactions: Transaction[];

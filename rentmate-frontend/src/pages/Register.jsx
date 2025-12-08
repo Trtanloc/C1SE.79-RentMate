@@ -159,6 +159,21 @@ const Register = () => {
     }
   };
 
+  const beginFacebookOAuth = () => {
+    const apiBase =
+      import.meta.env.VITE_API_BASE_URL ||
+      import.meta.env.VITE_API_URL ||
+      '/api';
+    const state = btoa(
+      JSON.stringify({
+        intent: 'register',
+        ts: Date.now(),
+      }),
+    );
+    const url = `${apiBase}/auth/facebook?state=${encodeURIComponent(state)}&returnUrl=${encodeURIComponent('/dashboard')}`;
+    window.location.href = url;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitError(null);
@@ -367,6 +382,13 @@ const Register = () => {
             {verificationError && <p className="text-sm text-danger">{verificationError}</p>}
           </div>
           {submitError && <p className="text-sm text-danger">{submitError}</p>}
+          <button
+            type="button"
+            onClick={beginFacebookOAuth}
+            className="w-full rounded-xl border border-blue-200 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+          >
+            Đăng ký nhanh với Facebook
+          </button>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="submit"

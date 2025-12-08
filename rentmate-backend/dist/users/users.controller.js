@@ -18,6 +18,7 @@ const bcrypt = require("bcrypt");
 const users_service_1 = require("./users.service");
 const create_user_dto_1 = require("./dto/create-user.dto");
 const update_user_dto_1 = require("./dto/update-user.dto");
+const change_password_dto_1 = require("./dto/change-password.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
@@ -66,8 +67,13 @@ let UsersController = class UsersController {
             throw new common_1.ForbiddenException('You cannot change the user role');
         }
         const payload = Object.assign({}, updateUserDto);
-        if (updateUserDto.password) {
-            payload.password = await bcrypt.hash(updateUserDto.password, 10);
+        if (typeof updateUserDto.password !== 'undefined') {
+            if (actor.role === user_role_enum_1.UserRole.Admin && actor.id !== id) {
+                payload.password = await bcrypt.hash(updateUserDto.password, 10);
+            }
+            else {
+                throw new common_1.BadRequestException('Use the change password form to update your password');
+            }
         }
         const user = await this.usersService.update(id, payload);
         return {
@@ -82,6 +88,17 @@ let UsersController = class UsersController {
         return {
             success: true,
             message: 'User deleted successfully',
+        };
+    }
+    async changePassword(id, dto, req) {
+        const actor = req.user;
+        if (actor.id !== id) {
+            throw new common_1.ForbiddenException('You can only change your own password');
+        }
+        await this.usersService.changePassword(id, dto);
+        return {
+            success: true,
+            message: 'Password updated successfully',
         };
     }
     ensureOwnershipOrAdmin(user, resourceOwnerId) {
@@ -146,6 +163,15 @@ __decorate([
     __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Put)(':id/password'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, change_password_dto_1.ChangePasswordDto, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "changePassword", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, common_1.Controller)('users'),

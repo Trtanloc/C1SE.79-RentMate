@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -12,15 +13,19 @@ const ContractsPage = () => {
     const load = async () => {
       setLoading(true);
       setError(null);
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
       try {
         const endpoint =
           user && (user.role === 'admin' || user.role === 'manager')
             ? '/contracts'
-            : '/contracts/my';
+            : `/contracts/user/${user?.id}`;
         const { data } = await axiosClient.get(endpoint);
         setContracts(data?.data || []);
       } catch (err) {
-        const message = err?.response?.data?.message || 'Không thể tải hợp đồng.';
+        const message = err?.response?.data?.message || 'Không tải được danh sách hợp đồng.';
         setError(Array.isArray(message) ? message.join(', ') : message);
       } finally {
         setLoading(false);
@@ -42,14 +47,27 @@ const ContractsPage = () => {
       link.click();
       link.parentNode.removeChild(link);
     } catch (err) {
-      alert(err?.response?.data?.message || 'Không thể tải PDF');
+      const message = err?.response?.data?.message || 'Không thể tải PDF.';
+      setError(Array.isArray(message) ? message.join(', ') : message);
     }
   };
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-3xl font-semibold text-gray-800">Hợp đồng</h1>
-      <p className="text-sm text-gray-500">Danh sách hợp đồng và tải file PDF.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-gray-800">Hợp đồng của tôi</h1>
+          <p className="text-sm text-gray-500">
+            Danh sách hợp đồng đã tạo và liên kết với tài khoản của bạn.
+          </p>
+        </div>
+        <Link
+          to="/properties"
+          className="rounded-xl border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+        >
+          Tạo hợp đồng mới
+        </Link>
+      </div>
       {loading ? (
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 text-gray-500">
           Đang tải...
@@ -66,27 +84,43 @@ const ContractsPage = () => {
                 <th className="px-4 py-3">Mã</th>
                 <th className="px-4 py-3">Tiêu đề</th>
                 <th className="px-4 py-3">BĐS</th>
-                <th className="px-4 py-3">Tenant</th>
+                <th className="px-4 py-3">Bên thuê</th>
                 <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3">Ngày tạo</th>
                 <th className="px-4 py-3">Hành động</th>
               </tr>
             </thead>
             <tbody>
               {contracts.length === 0 && (
                 <tr>
-                  <td className="px-4 py-4 text-center text-gray-500" colSpan={6}>
-                    Chưa có hợp đồng.
+                  <td className="px-4 py-4 text-center text-gray-500" colSpan={7}>
+                    Chưa có hợp đồng nào.
                   </td>
                 </tr>
               )}
               {contracts.map((c) => (
                 <tr key={c.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3">{c.contractNumber}</td>
+                  <td className="px-4 py-3 font-semibold text-gray-800">
+                    {c.contractNumber || `#${c.id}`}
+                  </td>
                   <td className="px-4 py-3">{c.title}</td>
                   <td className="px-4 py-3">{c.property?.title || c.propertyId}</td>
                   <td className="px-4 py-3">{c.tenant?.fullName || c.tenantId}</td>
-                  <td className="px-4 py-3">{c.status}</td>
                   <td className="px-4 py-3">
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase text-primary">
+                      {c.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : '--'}
+                  </td>
+                  <td className="px-4 py-3 space-x-2">
+                    <Link
+                      to={`/contracts/${c.id}/preview`}
+                      className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                    >
+                      Xem
+                    </Link>
                     <button
                       type="button"
                       onClick={() => downloadPdf(c.id)}

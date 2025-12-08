@@ -18,6 +18,8 @@ const PropertyDetail = () => {
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [reviewError, setReviewError] = useState(null);
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [creatingContract, setCreatingContract] = useState(false);
+  const [contractError, setContractError] = useState(null);
   const { propertyStatusMeta } = useMetadata();
   const { t } = useI18n();
   const { isAuthenticated, user } = useAuth();
@@ -119,6 +121,42 @@ const PropertyDetail = () => {
       );
     } finally {
       setReviewSaving(false);
+    }
+  };
+
+  const handleCreateContract = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: `/properties/${id}` } } });
+      return;
+    }
+    setCreatingContract(true);
+    setContractError(null);
+    const startDate =
+      property.availableFrom || new Date().toISOString().slice(0, 10);
+    const endDate = (() => {
+      const end = new Date(startDate);
+      end.setFullYear(end.getFullYear() + 1);
+      return end.toISOString().slice(0, 10);
+    })();
+
+    try {
+      const payload = {
+        listingId: property.id,
+        startDate,
+        endDate,
+        monthlyRent: property.price ? Number(property.price) : undefined,
+        depositAmount: property.price ? Number(property.price) * 2 : undefined,
+        notes: `Hợp đồng tạo tự động cho ${property.title}`,
+      };
+      const { data } = await axiosClient.post('/contracts/create', payload);
+      navigate(`/contracts/${data.data.id}/preview`);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        'Không thể tạo hợp đồng cho bất động sản này.';
+      setContractError(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setCreatingContract(false);
     }
   };
 
@@ -348,6 +386,19 @@ const PropertyDetail = () => {
             >
               {t('property.detail.contact', 'Contact Landlord')}
             </button>
+            <button
+              type="button"
+              onClick={handleCreateContract}
+              disabled={creatingContract}
+              className="w-full rounded-xl border border-primary px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {creatingContract ? 'Đang tạo hợp đồng...' : 'Tạo hợp đồng'}
+            </button>
+            {contractError && (
+              <p className="text-sm text-danger">
+                {contractError}
+              </p>
+            )}
             {property.owner && (
               <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
                 <p className="font-semibold text-gray-700">

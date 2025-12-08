@@ -24,7 +24,6 @@ const verify_code_dto_1 = require("../verification-codes/dto/verify-code.dto");
 const password_resets_service_1 = require("../password-resets/password-resets.service");
 const request_reset_dto_1 = require("../password-resets/dto/request-reset.dto");
 const perform_reset_dto_1 = require("../password-resets/dto/perform-reset.dto");
-const facebook_login_dto_1 = require("./dto/facebook-login.dto");
 let AuthController = class AuthController {
     constructor(authService, verificationCodesService, passwordResetsService) {
         this.authService = authService;
@@ -69,13 +68,14 @@ let AuthController = class AuthController {
             data: result,
         };
     }
-    async loginWithFacebook(dto) {
-        const result = await this.authService.loginWithFacebook(dto);
-        return {
-            success: true,
-            message: 'Facebook login successful',
-            data: result,
-        };
+    async redirectToFacebook(res, state, returnUrl) {
+        const url = this.authService.buildFacebookAuthUrl({ state, returnUrl });
+        return res.redirect(url);
+    }
+    async handleFacebookCallback(code, state = '', res) {
+        const { token, expiresAt } = await this.authService.handleFacebookCallback(code, state);
+        const redirectUrl = this.authService.buildFacebookSuccessRedirect(token, expiresAt, state);
+        return res.redirect(redirectUrl);
     }
     async forgotPassword(dto) {
         await this.passwordResetsService.request(dto);
@@ -124,12 +124,23 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([
-    (0, common_1.Post)('login/facebook'),
-    __param(0, (0, common_1.Body)()),
+    (0, common_1.Get)('facebook'),
+    __param(0, (0, common_1.Res)()),
+    __param(1, (0, common_1.Query)('state')),
+    __param(2, (0, common_1.Query)('returnUrl')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [facebook_login_dto_1.FacebookLoginDto]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
-], AuthController.prototype, "loginWithFacebook", null);
+], AuthController.prototype, "redirectToFacebook", null);
+__decorate([
+    (0, common_1.Get)('facebook/callback'),
+    __param(0, (0, common_1.Query)('code')),
+    __param(1, (0, common_1.Query)('state')),
+    __param(2, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "handleFacebookCallback", null);
 __decorate([
     (0, common_1.Post)('forgot-password'),
     __param(0, (0, common_1.Body)()),

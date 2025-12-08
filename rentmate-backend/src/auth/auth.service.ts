@@ -14,12 +14,23 @@ import { User } from '../users/entities/user.entity';
 import { VerificationCodesService } from '../verification-codes/verification-codes.service';
 import { UserRole } from '../common/enums/user-role.enum';
 import { ConfigService } from '@nestjs/config';
-import { FacebookLoginDto } from './dto/facebook-login.dto';
 
 type JwtPayload = {
   sub: number;
   email: string;
   role: string;
+};
+
+type FacebookProfile = {
+  id: string;
+  name?: string;
+  email?: string;
+  picture?: { data?: { url?: string }; url?: string };
+};
+
+type EncodedState = {
+  returnUrl?: string;
+  payload?: string;
 };
 
 const sanitizeUser = (user: User) => {
@@ -61,17 +72,7 @@ export class AuthService {
 
     await this.verificationCodesService.markAsUsed(registerDto.verificationId);
 
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const token = await this.jwtService.signAsync(payload);
-    return {
-      token,
-      user: sanitizeUser(user),
-    };
+    return this.issueToken(user, true);
   }
 
   private async validateUser(email: string, password: string): Promise<User> {
@@ -90,27 +91,84 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
-
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const token = await this.jwtService.signAsync(payload, {
-      expiresIn: this.getExpiry(loginDto.remember) as JwtSignOptions['expiresIn'],
-    });
-
-    return {
-      token,
-      expiresAt: this.resolveExpiresAt(loginDto.remember),
-      user: sanitizeUser(user),
-    };
+    return this.issueToken(user, loginDto.remember);
   }
 
   async logout() {
     // Stateless JWT logout stub; client should discard token.
     return { message: 'Logout successful' };
+  }
+
+  buildFacebookAuthUrl(params: { state?: string; returnUrl?: string } = {}) {
+    const appId = this.configService.get<string>('FACEBOOK_APP_ID');
+    if (!appId) {
+      throw new UnauthorizedException('Facebook login is not configured');
+    }
+    const redirectUri = this.getFacebookRedirectUri();
+    const url = new URL('https://www.facebook.com/v18.0/dialog/oauth');
+    url.searchParams.set('client_id', appId);
+    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('scope', 'email,public_profile');
+
+    const encodedState = this.encodeState(params.state, params.returnUrl);
+    if (encodedState) {
+      url.searchParams.set('state', encodedState);
+    }
+    return url.toString();
+  }
+
+  async handleFacebookCallback(code: string, rawState?: string) {
+    if (!code) {
+      throw new UnauthorizedException('Missing Facebook authorization code');
+    }
+    const accessToken = await this.exchangeFacebookCode(code);
+    const profile = await this.fetchFacebookProfile(accessToken);
+    const user = await this.upsertFacebookUser(profile);
+    return this.issueToken(user, true);
+  }
+
+  buildFacebookSuccessRedirect(
+    token: string,
+    expiresAt: string,
+    rawState?: string,
+  ) {
+    const frontendBase =
+      this.configService.get<string>('APP_BASE_URL') ||
+      'http://localhost:5173';
+    const normalized = frontendBase.endsWith('/')
+      ? frontendBase.slice(0, -1)
+      : frontendBase;
+
+    const parsedState = this.parseState(rawState);
+    const params = new URLSearchParams({ token });
+    if (expiresAt) {
+      params.set('expiresAt', expiresAt);
+    }
+    if (parsedState?.returnUrl) {
+      params.set('returnUrl', parsedState.returnUrl);
+    }
+    return `${normalized}/auth/success?${params.toString()}`;
+  }
+
+  private async issueToken(user: User, remember = true) {
+    const payload = this.buildJwtPayload(user);
+    const token = await this.jwtService.signAsync(payload, {
+      expiresIn: this.getExpiry(remember) as JwtSignOptions['expiresIn'],
+    });
+
+    return {
+      token,
+      expiresAt: this.resolveExpiresAt(remember),
+      user: sanitizeUser(user),
+    };
+  }
+
+  private buildJwtPayload(user: User): JwtPayload {
+    return {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
   }
 
   private getExpiry(remember?: boolean): string | number {
@@ -129,35 +187,110 @@ export class AuthService {
     return expires.toISOString();
   }
 
-  async loginWithFacebook(dto: FacebookLoginDto) {
+  private getFacebookRedirectUri() {
+    const explicit = this.configService.get<string>('FACEBOOK_REDIRECT_URI');
+    if (explicit) {
+      return explicit;
+    }
+    const apiBase =
+      this.configService.get<string>('API_BASE_URL') ||
+      `http://localhost:${this.configService.get<number>('PORT') || 3000}`;
+    const normalizedBase = apiBase.endsWith('/')
+      ? apiBase.slice(0, -1)
+      : apiBase;
+    const apiRoot = normalizedBase.endsWith('/api')
+      ? normalizedBase
+      : `${normalizedBase}/api`;
+    return `${apiRoot}/auth/facebook/callback`;
+  }
+
+  private encodeState(state?: string, returnUrl?: string): string | undefined {
+    const payload: EncodedState = {};
+    if (state) {
+      payload.payload = state;
+    }
+    if (returnUrl) {
+      payload.returnUrl = returnUrl;
+    }
+    if (Object.keys(payload).length === 0) {
+      return undefined;
+    }
+    return Buffer.from(JSON.stringify(payload)).toString('base64url');
+  }
+
+  private parseState(raw?: string): EncodedState | null {
+    if (!raw) return null;
+    try {
+      const decoded = Buffer.from(raw, 'base64url').toString('utf8');
+      const parsed = JSON.parse(decoded) as EncodedState;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  private async exchangeFacebookCode(code: string): Promise<string> {
+    const appId = this.configService.get<string>('FACEBOOK_APP_ID');
+    const appSecret = this.configService.get<string>('FACEBOOK_APP_SECRET');
+    if (!appId || !appSecret) {
+      throw new UnauthorizedException('Facebook login is not configured');
+    }
+
+    const graphBase =
+      this.configService.get<string>('FACEBOOK_GRAPH_URL') ??
+      'https://graph.facebook.com';
+    const redirectUri = this.getFacebookRedirectUri();
+    const tokenUrl = `${graphBase}/v18.0/oauth/access_token`;
+
+    try {
+      const { data } = await axios.get(tokenUrl, {
+        params: {
+          client_id: appId,
+          client_secret: appSecret,
+          redirect_uri: redirectUri,
+          code,
+        },
+        timeout: 5000,
+      });
+      if (!data?.access_token) {
+        throw new UnauthorizedException('Facebook access token missing');
+      }
+      return data.access_token;
+    } catch (error: any) {
+      throw new UnauthorizedException(
+        error?.response?.data?.error?.message ||
+          'Unable to exchange Facebook authorization code',
+      );
+    }
+  }
+
+  private async fetchFacebookProfile(accessToken: string): Promise<FacebookProfile> {
     const graphBase =
       this.configService.get<string>('FACEBOOK_GRAPH_URL') ??
       'https://graph.facebook.com';
     const fields = 'id,name,email,picture';
-    const requestUrl = `${graphBase}/me?fields=${fields}&access_token=${encodeURIComponent(dto.accessToken)}`;
+    const requestUrl = `${graphBase}/me?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`;
 
-    let profile: { id: string; name?: string; email?: string; picture?: any };
     try {
       const response = await axios.get(requestUrl, { timeout: 5000 });
-      profile = response.data;
+      if (!response.data?.id) {
+        throw new UnauthorizedException('Invalid Facebook profile response');
+      }
+      return response.data;
     } catch (error: any) {
       throw new UnauthorizedException(
         error?.response?.data?.error?.message ||
-          'Unable to verify Facebook access token',
+          'Unable to fetch Facebook profile',
       );
     }
+  }
 
-    if (!profile?.id) {
-      throw new UnauthorizedException('Invalid Facebook profile');
-    }
-
-    const email = profile.email?.toLowerCase() ?? `fb-${profile.id}@facebook.com`;
+  private async upsertFacebookUser(profile: FacebookProfile): Promise<User> {
+    const email =
+      profile.email?.toLowerCase() ?? `fb-${profile.id}@facebook.com`;
     const fullName = profile.name || 'Facebook User';
     const avatarUrl =
-      dto.avatarUrl ||
-      profile.picture?.data?.url ||
-      profile.picture?.url ||
-      undefined;
+      profile.picture?.data?.url || profile.picture?.url || undefined;
 
     let user = await this.usersService.findByFacebookId(profile.id);
     if (!user) {
@@ -185,19 +318,6 @@ export class AuthService {
       user = await this.usersService.findById(user.id);
     }
 
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-    const token = await this.jwtService.signAsync(payload, {
-      expiresIn: this.getExpiry(true) as JwtSignOptions['expiresIn'],
-    });
-
-    return {
-      token,
-      expiresAt: this.resolveExpiresAt(true),
-      user: sanitizeUser(user),
-    };
+    return user;
   }
 }

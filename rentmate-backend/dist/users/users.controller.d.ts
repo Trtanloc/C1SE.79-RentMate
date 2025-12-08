@@ -2,6 +2,7 @@ import { Request } from 'express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { User } from './entities/user.entity';
 import { ListUsersDto } from './dto/list-users.dto';
 export declare class UsersController {
@@ -33,6 +34,10 @@ export declare class UsersController {
         data: User;
     }>;
     remove(id: number, req: Request): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    changePassword(id: number, dto: ChangePasswordDto, req: Request): Promise<{
         success: boolean;
         message: string;
     }>;

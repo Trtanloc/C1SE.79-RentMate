@@ -36,27 +36,23 @@ const Login = () => {
     }
   };
 
-  const handleFacebookLogin = async () => {
-    const token = window.prompt('Nhập Facebook access token để đăng nhập nhanh:');
-    if (!token) return;
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const { data } = await axiosClient.post('/auth/login/facebook', {
-        accessToken: token,
-      });
-      const { user, token: jwt, expiresAt } = data.data;
-      login(user, jwt, { remember: true, expiresAt });
-      const redirectTo = location.state?.from?.pathname || '/';
-      navigate(redirectTo, { replace: true });
-    } catch (err) {
-      const message =
-        err.response?.data?.message ||
-        'Không thể đăng nhập bằng Facebook. Kiểm tra access token.';
-      setError(Array.isArray(message) ? message.join(', ') : message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const beginFacebookOAuth = (intent = 'login') => {
+    const apiBase =
+      import.meta.env.VITE_API_BASE_URL ||
+      import.meta.env.VITE_API_URL ||
+      '/api';
+    const returnUrl =
+      location.state?.from?.pathname && location.state.from.pathname !== '/login'
+        ? location.state.from.pathname
+        : '/';
+    const state = btoa(
+      JSON.stringify({
+        intent,
+        ts: Date.now(),
+      }),
+    );
+    const url = `${apiBase}/auth/facebook?state=${encodeURIComponent(state)}&returnUrl=${encodeURIComponent(returnUrl)}`;
+    window.location.href = url;
   };
 
   return (
@@ -123,14 +119,24 @@ const Login = () => {
         >
           {isSubmitting ? t('login.submit', 'Signing in...') : t('login.submit', 'Login')}
         </button>
-        <button
-          type="button"
-          disabled={isSubmitting}
-          onClick={handleFacebookLogin}
-          className="w-full rounded-xl border border-blue-600 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Đăng nhập với Facebook
-        </button>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => beginFacebookOAuth('login')}
+            className="w-full rounded-xl border border-blue-600 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Đăng nhập bằng Facebook
+          </button>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => beginFacebookOAuth('register')}
+            className="w-full rounded-xl border border-blue-100 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Đăng ký bằng Facebook
+          </button>
+        </div>
         <p className="text-center text-xs text-gray-500">
           {t('login.noAccount', 'New to RentMate?')}{' '}
           <Link to="/register" className="font-medium text-primary">

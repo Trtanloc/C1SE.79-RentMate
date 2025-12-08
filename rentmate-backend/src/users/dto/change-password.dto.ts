@@ -6,10 +6,10 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class PerformResetDto {
+export class ChangePasswordDto {
   @IsString()
   @IsNotEmpty()
-  token: string;
+  currentPassword: string;
 
   @IsString()
   @IsNotEmpty()
@@ -19,11 +19,11 @@ export class PerformResetDto {
     message:
       'Password must contain at least one uppercase letter, one lowercase letter, and one special character',
   })
-  password: string;
+  newPassword: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
   @MaxLength(50)
-  confirmPassword: string;
+  confirmNewPassword: string;
 }
