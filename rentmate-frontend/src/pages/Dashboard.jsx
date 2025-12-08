@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axiosClient from '../api/axiosClient.js';
 import PropertyCard from '../components/PropertyCard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -7,7 +7,8 @@ import { useMetadata } from '../context/MetadataContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { PropertyStatus, UserRole } from '../utils/constants.js';
 import { useI18n } from '../i18n/useI18n.js';
-import { getCityLabel } from '../utils/cities.js';
+import { fallbackCities, getCityLabel } from '../utils/cities.js';
+import { fetchProvinces, fetchDistricts, fetchWards } from '../api/locationApi.js';
 
 const createEmptyForm = (defaults) => ({
   title: '',
@@ -15,6 +16,7 @@ const createEmptyForm = (defaults) => ({
   address: '',
   city: defaults.city || '',
   district: '',
+  ward: '',
   country: defaults.country || '',
   mapEmbedUrl: '',
   virtualTourUrl: '',
@@ -59,6 +61,11 @@ const Dashboard = () => {
   const [formErrors, setFormErrors] = useState({});
   const [photoFiles, setPhotoFiles] = useState([]);
   const photoInputRef = useRef(null);
+  const [provinceOptions, setProvinceOptions] = useState([]);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState('');
+  const [districtOptions, setDistrictOptions] = useState([]);
+  const [wardOptions, setWardOptions] = useState([]);
+  const [locationError, setLocationError] = useState(null);
 
   const statusOptions = useMemo(() => {
     if (propertyStatuses.length > 0) {
@@ -70,11 +77,42 @@ const Dashboard = () => {
     }));
   }, [propertyStatuses, propertyStatusMeta]);
 
-  const cityOptions = useMemo(() => {
-    const set = new Set(cities);
-    if (form.city) set.add(form.city);
-    return Array.from(set);
-  }, [cities, form.city]);
+  const normalizeToken = (value = '') =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z0-9]/g, '');
+
+  const allowedCityMap = useMemo(() => {
+    const map = new Map();
+    fallbackCities.forEach((city) => {
+      map.set(normalizeToken(city), city);
+    });
+    return map;
+  }, []);
+
+  const ensureAllowedCity = useCallback(
+    (value) => {
+      const normalized = normalizeToken(value || '');
+      return allowedCityMap.get(normalized) || allowedCityMap.values().next().value || '';
+    },
+    [allowedCityMap],
+  );
+
+  const mapProvinceNameToAllowedCity = useCallback(
+    (provinceName) => {
+      const normalized = normalizeToken(provinceName);
+      // Strip common prefixes like "tinh" or "thanhpho"
+      const stripped = normalized
+        .replace(/^tinh/, '')
+        .replace(/^thanhpho/, '')
+        .replace(/^tp/, '');
+      return allowedCityMap.get(normalized) || allowedCityMap.get(stripped) || provinceName;
+    },
+    [allowedCityMap],
+  );
 
   const canManageProperties = useMemo(
     () => user.role === UserRole.Landlord || user.role === UserRole.Admin,
@@ -82,16 +120,50 @@ const Dashboard = () => {
   );
 
   useEffect(() => {
+    const loadProvinces = async () => {
+      try {
+        setLocationError(null);
+        const provinces = await fetchProvinces();
+        setProvinceOptions(provinces);
+        if (!selectedProvinceCode && provinces.length) {
+          setSelectedProvinceCode(provinces[0].code);
+          setForm((prev) => ({
+            ...prev,
+            city: mapProvinceNameToAllowedCity(provinces[0].name),
+            district: '',
+            ward: '',
+          }));
+        }
+      } catch (err) {
+        const message =
+          err?.response?.data?.message || 'Unable to load provinces.';
+        setLocationError(Array.isArray(message) ? message.join(', ') : message);
+      }
+    };
+    loadProvinces();
+  }, []);
+
+  useEffect(() => {
     setForm((prev) =>
       createEmptyForm({
         ...prev,
         type: prev.type || defaultPropertyType || '',
         status: prev.status || defaultPropertyStatus || PropertyStatus.Available,
-        city: prev.city || cities[0] || '',
+        city: ensureAllowedCity(
+          prev.city || mapProvinceNameToAllowedCity(provinceOptions[0]?.name || cities[0] || ''),
+        ),
         country: prev.country || countries[0] || 'Vietnam',
       }),
     );
-  }, [defaultPropertyStatus, defaultPropertyType, cities, countries]);
+  }, [
+    defaultPropertyStatus,
+    defaultPropertyType,
+    cities,
+    countries,
+    ensureAllowedCity,
+    mapProvinceNameToAllowedCity,
+    provinceOptions,
+  ]);
 
   useEffect(() => {
     if (!canManageProperties) {
@@ -118,6 +190,94 @@ const Dashboard = () => {
 
     fetchProperties();
   }, [canManageProperties, user]);
+
+  useEffect(() => {
+    const province =
+      provinceOptions.find((item) => item.code === selectedProvinceCode) ||
+      provinceOptions.find(
+        (item) => mapProvinceNameToAllowedCity(item.name) === form.city,
+      );
+    if (!province) {
+      const fallbackDistricts = form.district
+        ? [{ code: 'CUSTOM_DISTRICT', name: form.district }]
+        : [];
+      setDistrictOptions(fallbackDistricts);
+      if (form.ward) {
+        setWardOptions([{ code: 'CUSTOM_WARD', name: form.ward }]);
+      } else {
+        setWardOptions([]);
+      }
+      return;
+    }
+    let canceled = false;
+    const loadDistricts = async () => {
+      try {
+        setLocationError(null);
+        const districts = await fetchDistricts(province.code);
+        if (canceled) return;
+        setDistrictOptions(districts);
+        setForm((prev) => {
+          const hasCurrent = districts.some((d) => d.name === prev.district);
+          if (hasCurrent) {
+            return prev;
+          }
+          return {
+            ...prev,
+            district: districts[0]?.name || '',
+            ward: '',
+          };
+        });
+      } catch (err) {
+        if (canceled) return;
+        const message =
+          err?.response?.data?.message || 'Unable to load districts.';
+        setLocationError(Array.isArray(message) ? message.join(', ') : message);
+        setDistrictOptions([]);
+      }
+    };
+    loadDistricts();
+    return () => {
+      canceled = true;
+    };
+  }, [form.city, mapProvinceNameToAllowedCity, provinceOptions, selectedProvinceCode]);
+
+  useEffect(() => {
+    const district = districtOptions.find((item) => item.name === form.district);
+    if (!district) {
+      const fallback = form.ward ? [{ code: 'CUSTOM_WARD', name: form.ward }] : [];
+      setWardOptions(fallback);
+      if (!fallback.length) {
+        setForm((prev) => ({ ...prev, ward: '' }));
+      }
+      return;
+    }
+    let canceled = false;
+    const loadWards = async () => {
+      try {
+        setLocationError(null);
+        const wards = await fetchWards(district.code);
+        if (canceled) return;
+        setWardOptions(wards);
+        setForm((prev) => {
+          const hasCurrent = wards.some((w) => w.name === prev.ward);
+          if (hasCurrent) {
+            return prev;
+          }
+          return { ...prev, ward: wards[0]?.name || '' };
+        });
+      } catch (err) {
+        if (canceled) return;
+        const message =
+          err?.response?.data?.message || 'Unable to load wards.';
+        setLocationError(Array.isArray(message) ? message.join(', ') : message);
+        setWardOptions([]);
+      }
+    };
+    loadWards();
+    return () => {
+      canceled = true;
+    };
+  }, [form.district, districtOptions]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -146,13 +306,26 @@ const Dashboard = () => {
   };
 
   const startEdit = (property) => {
+    const matchedProvince =
+      provinceOptions.find(
+        (item) => mapProvinceNameToAllowedCity(item.name) === property.city,
+      ) || provinceOptions[0];
+    if (matchedProvince) {
+      setSelectedProvinceCode(matchedProvince.code);
+    }
     setEditingId(property.id);
     setForm({
       title: property.title || '',
       description: property.description || '',
       address: property.address || '',
-      city: property.city || '',
+      city: ensureAllowedCity(
+        property.city ||
+          mapProvinceNameToAllowedCity(matchedProvince?.name) ||
+          matchedProvince?.name ||
+          '',
+      ),
       district: property.district || '',
+      ward: property.ward || '',
       country: property.country || '',
       mapEmbedUrl: property.mapEmbedUrl || '',
       virtualTourUrl: property.virtualTourUrl || '',
@@ -201,6 +374,9 @@ const Dashboard = () => {
     if (!values.district.trim()) {
       nextErrors.district = 'District is required';
     }
+    if (!values.ward.trim()) {
+      nextErrors.ward = 'Ward is required';
+    }
     if (!values.country.trim()) {
       nextErrors.country = 'Country is required';
     }
@@ -223,12 +399,23 @@ const Dashboard = () => {
     if (!values.description.trim()) {
       nextErrors.description = 'Description is required';
     }
+    const amenitiesList = values.amenities
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (amenitiesList.length > 12) {
+      nextErrors.amenities = 'Limit amenities to 12 items max';
+    }
     const photosList = values.photos
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
-    if (photosList.length === 0 && (!selectedFiles || selectedFiles.length === 0)) {
+    const totalPhotos = photosList.length + (selectedFiles?.length || 0);
+    if (totalPhotos === 0) {
       nextErrors.photos = 'Add at least one photo (upload or URL)';
+    }
+    if (totalPhotos > 12) {
+      nextErrors.photos = 'Add at most 12 photos total';
     }
     return nextErrors;
   };
@@ -246,19 +433,25 @@ const Dashboard = () => {
     const amenitiesList = form.amenities
       .split(',')
       .map((item) => item.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, 12);
     const photoUrlList = (form.photos || '')
       .split(',')
       .map((item) => item.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, 12);
 
     try {
       const formData = new FormData();
       formData.append('title', form.title.trim());
       formData.append('description', form.description.trim());
       formData.append('address', form.address.trim());
-      formData.append('city', form.city.trim());
+      const cityValue = ensureAllowedCity(form.city.trim());
+      formData.append('city', cityValue);
       formData.append('district', form.district.trim());
+      if (form.ward) {
+        formData.append('ward', form.ward.trim());
+      }
       formData.append('country', form.country.trim());
       if (form.mapEmbedUrl) {
         formData.append('mapEmbedUrl', form.mapEmbedUrl.trim());
@@ -272,9 +465,14 @@ const Dashboard = () => {
       formData.append('area', String(Number(form.area)));
       formData.append('bedrooms', String(Number(form.bedrooms)));
       formData.append('bathrooms', String(Number(form.bathrooms)));
-      amenitiesList.forEach((amenity) => formData.append('amenities', amenity));
-      photoUrlList.forEach((url) => formData.append('photos', url));
-      photoFiles.forEach((file) => formData.append('photoFiles', file));
+      if (amenitiesList.length > 0) {
+        amenitiesList.forEach((amenity) => formData.append('amenities', amenity));
+      }
+      if (photoUrlList.length > 0) {
+        photoUrlList.forEach((url) => formData.append('photos', url));
+      }
+      const remainingSlots = Math.max(12 - photoUrlList.length, 0);
+      photoFiles.slice(0, remainingSlots).forEach((file) => formData.append('photoFiles', file));
 
       const endpoint = editingId ? `/properties/${editingId}` : '/properties';
       const method = editingId ? 'put' : 'post';
@@ -414,6 +612,9 @@ const Dashboard = () => {
           {metadataLoading && (
             <p className="text-xs text-gray-400">{t('property.list.loading', 'Loading...')}</p>
           )}
+          {locationError && (
+            <p className="text-xs text-danger">{locationError}</p>
+          )}
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div>
               <label htmlFor="title" className="mb-1 block text-sm font-medium text-gray-700">
@@ -449,19 +650,30 @@ const Dashboard = () => {
             </div>
             <div>
               <label htmlFor="city" className="mb-1 block text-sm font-medium text-gray-700">
-                {t('dashboard.form.city', 'City')}
+                {t('dashboard.form.city', 'Province / City')}
               </label>
               <select
                 id="city"
                 name="city"
-                value={form.city}
-                onChange={handleChange}
+                value={selectedProvinceCode}
+                onChange={(event) => {
+                  const code = event.target.value;
+                  setSelectedProvinceCode(code);
+                  const province = provinceOptions.find((p) => p.code === code);
+                  const mappedCity = province ? mapProvinceNameToAllowedCity(province.name) : '';
+                  setForm((prev) => ({
+                    ...prev,
+                    city: mappedCity,
+                    district: '',
+                    ward: '',
+                  }));
+                }}
                 className={fieldClass('city')}
               >
                 <option value="">{t('search.allCities', 'All cities')}</option>
-                {cityOptions.map((city) => (
-                  <option key={city} value={city}>
-                    {getCityLabel(city, lang)}
+                {provinceOptions.map((province) => (
+                  <option key={province.code} value={province.code}>
+                    {getCityLabel(province.name, lang)}
                   </option>
                 ))}
               </select>
@@ -471,17 +683,43 @@ const Dashboard = () => {
               <label htmlFor="district" className="mb-1 block text-sm font-medium text-gray-700">
                 {t('dashboard.form.district', 'District')}
               </label>
-              <input
+              <select
                 id="district"
                 name="district"
                 value={form.district}
                 onChange={handleChange}
-                placeholder="Thu Duc"
                 className={fieldClass('district')}
-              />
+              >
+                <option value="">{t('dashboard.form.district', 'District')}</option>
+                {districtOptions.map((district) => (
+                  <option key={district.code} value={district.name}>
+                    {district.name}
+                  </option>
+                ))}
+              </select>
               {formErrors.district && (
                 <p className="mt-1 text-xs text-danger">{formErrors.district}</p>
               )}
+            </div>
+            <div>
+              <label htmlFor="ward" className="mb-1 block text-sm font-medium text-gray-700">
+                {t('dashboard.form.ward', 'Ward')}
+              </label>
+              <select
+                id="ward"
+                name="ward"
+                value={form.ward}
+                onChange={handleChange}
+                className={fieldClass('ward')}
+              >
+                <option value="">{t('dashboard.form.ward', 'Ward')}</option>
+                {wardOptions.map((ward) => (
+                  <option key={ward.code} value={ward.name}>
+                    {ward.name}
+                  </option>
+                ))}
+              </select>
+              {formErrors.ward && <p className="mt-1 text-xs text-danger">{formErrors.ward}</p>}
             </div>
             <div>
               <label htmlFor="country" className="mb-1 block text-sm font-medium text-gray-700">

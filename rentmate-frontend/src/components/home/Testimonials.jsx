@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n/useI18n.js';
+import { resolveAssetUrl } from '../../utils/assets.js';
 
 const Testimonials = ({ items = [], error = null }) => {
   const { t } = useI18n();
@@ -37,7 +38,7 @@ const Testimonials = ({ items = [], error = null }) => {
             <div className="mt-5 flex items-center gap-3">
               {testimonial?.avatarUrl && (
                 <img
-                  src={testimonial.avatarUrl}
+                  src={resolveAssetUrl(testimonial.avatarUrl)}
                   alt={testimonial.authorName}
                   className="h-12 w-12 rounded-full object-cover"
                 />
