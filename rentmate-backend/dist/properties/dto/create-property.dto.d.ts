@@ -7,6 +7,7 @@ export declare class CreatePropertyDto {
     address: string;
     city: string;
     district: string;
+    ward?: string;
     country: string;
     price: number;
     area: number;

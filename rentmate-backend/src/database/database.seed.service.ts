@@ -28,6 +28,7 @@ type SeedProperty = {
   address: string;
   city: string;
   district: string;
+  ward?: string;
   country: string;
   price: number;
   area: number;
@@ -445,6 +446,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
         address: '208 Nguyen Huu Canh, Binh Thanh, HCMC',
         city: 'Ho Chi Minh City',
         district: 'Binh Thanh',
+        ward: 'Ward 1',
         country: 'Vietnam',
         price: 25000000,
         area: 78,
@@ -470,6 +472,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
         address: '23 Street 9, Thao Dien, Thu Duc, HCMC',
         city: 'Ho Chi Minh City',
         district: 'Thu Duc',
+        ward: 'Linh Tay',
         country: 'Vietnam',
         price: 42000000,
         area: 180,
@@ -489,6 +492,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
         address: '15 Nguyen Van Linh, District 7, HCMC',
         city: 'Ho Chi Minh City',
         district: 'District 7',
+        ward: 'Tan Phong',
         country: 'Vietnam',
         price: 12000000,
         area: 45,
@@ -508,6 +512,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
         address: '18 Vo Nguyen Giap, Son Tra, Da Nang',
         city: 'Da Nang',
         district: 'Son Tra',
+        ward: 'An Hai Tay',
         country: 'Vietnam',
         price: 18000000,
         area: 70,
@@ -527,6 +532,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
         address: '12 Hang Bong, Hoan Kiem, Hanoi',
         city: 'Hanoi',
         district: 'Hoan Kiem',
+        ward: 'Trang Tien',
         country: 'Vietnam',
         price: 16000000,
         area: 62,

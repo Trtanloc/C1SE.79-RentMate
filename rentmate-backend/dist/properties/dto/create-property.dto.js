@@ -11,9 +11,27 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreatePropertyDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const property_status_enum_1 = require("../../common/enums/property-status.enum");
 const property_type_enum_1 = require("../../common/enums/property-type.enum");
 const vietnam_cities_1 = require("../../common/constants/vietnam-cities");
+const toStringArray = (value) => {
+    if (value === undefined || value === null)
+        return undefined;
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => (typeof item === 'string' ? item : String(item)))
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        return value
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+    return undefined;
+};
 class CreatePropertyDto {
 }
 exports.CreatePropertyDto = CreatePropertyDto;
@@ -47,6 +65,12 @@ __decorate([
     (0, class_validator_1.MaxLength)(120),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "district", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(120),
+    __metadata("design:type", String)
+], CreatePropertyDto.prototype, "ward", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(120),
@@ -106,6 +130,7 @@ __decorate([
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.ArrayNotEmpty)(),
     (0, class_validator_1.ArrayMaxSize)(12),
+    (0, class_transformer_1.Transform)(({ value }) => toStringArray(value)),
     __metadata("design:type", Array)
 ], CreatePropertyDto.prototype, "amenities", void 0);
 __decorate([
@@ -115,6 +140,7 @@ __decorate([
     (0, class_validator_1.ArrayMaxSize)(12),
     (0, class_validator_1.IsString)({ each: true }),
     (0, class_validator_1.MaxLength)(50, { each: true }),
+    (0, class_transformer_1.Transform)(({ value }) => toStringArray(value)),
     __metadata("design:type", Array)
 ], CreatePropertyDto.prototype, "photos", void 0);
 //# sourceMappingURL=create-property.dto.js.map

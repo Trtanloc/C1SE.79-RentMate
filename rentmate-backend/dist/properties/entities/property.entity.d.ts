@@ -15,6 +15,7 @@ export declare class Property {
     address: string;
     city: string;
     district: string;
+    ward?: string;
     country: string;
     price: number;
     area: number;

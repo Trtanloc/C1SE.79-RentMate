@@ -68,6 +68,10 @@ __decorate([
     __metadata("design:type", String)
 ], Property.prototype, "district", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ length: 120, nullable: true }),
+    __metadata("design:type", String)
+], Property.prototype, "ward", void 0);
+__decorate([
     (0, typeorm_1.Column)({ length: 120 }),
     __metadata("design:type", String)
 ], Property.prototype, "country", void 0);
