@@ -299,6 +299,13 @@ export class ContractsService {
         startDate: contract.startDate,
         endDate: contract.endDate,
       },
+      platform: {
+        name: 'RentMate',
+        website: process.env.APP_BASE_URL,
+        email: process.env.MAIL_FROM,
+        phone: process.env.SUPPORT_PHONE,
+        role: 'Nền tảng giữ hộ tiền cọc giữa các bên',
+      },
       generatedAt: new Date().toISOString(),
     };
     return buildContractHtml(template);
