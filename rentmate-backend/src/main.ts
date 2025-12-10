@@ -8,6 +8,13 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
 
+    console.log('=== ENV VARIABLES ===');
+  console.log('MAIL_USER:', configService.get('MAIL_USER'));
+  console.log('MAIL_PASS:', configService.get('MAIL_PASS') ? '***SET***' : 'NOT SET');
+  console.log('MAIL_HOST:', configService.get('MAIL_HOST'));
+  console.log('MAIL_PORT:', configService.get('MAIL_PORT'));
+  console.log('====================');
+
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

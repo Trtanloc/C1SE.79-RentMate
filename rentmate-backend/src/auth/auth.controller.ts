@@ -123,4 +123,6 @@ export class AuthController {
     const result = await this.authService.logout();
     return { success: true, message: result.message, data: null };
   }
+
+  
 }

@@ -14,6 +14,7 @@ import { User } from '../users/entities/user.entity';
 import { VerificationCodesService } from '../verification-codes/verification-codes.service';
 import { UserRole } from '../common/enums/user-role.enum';
 import { ConfigService } from '@nestjs/config';
+import { MailerService } from '../mail/mailer.service';
 
 type JwtPayload = {
   sub: number;
@@ -45,6 +46,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly verificationCodesService: VerificationCodesService,
     private readonly configService: ConfigService,
+    private readonly mailerService: MailerService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -75,6 +77,8 @@ export class AuthService {
     return this.issueToken(user, true);
   }
 
+  
+
   private async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
@@ -88,6 +92,8 @@ export class AuthService {
 
     return user;
   }
+
+  
 
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
@@ -320,4 +326,6 @@ export class AuthService {
 
     return user;
   }
+
+  
 }

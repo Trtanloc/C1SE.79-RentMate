@@ -63,8 +63,7 @@ export class Property {
   @Column({ length: 120 })
   country: string;
 
-  @Column({ length: 120 })
-  ward: string;
+ 
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   price: number;
