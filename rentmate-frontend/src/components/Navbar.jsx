@@ -1,247 +1,334 @@
-import React from "react";
 
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, NavLink } from 'react-router-dom';
 import {
+  BarChart3,
+  Bell,
+  Globe2,
   Home,
-  Building2,
-  User,
-  Heart,
+  LayoutDashboard,
+  MessageSquare,
   Menu,
-  ChevronDown,
-  Phone,
-  MapPin,
-  LogOut,
-} from "lucide-react";
-import { Button } from "./ui/button";
-import { useAuth } from "../context/AuthContext";
-import { toast } from "sonner";
-import { Home, Building2, MapPin, ChevronDown, Heart, Search } from 'lucide-react';
+  Shield,
+  Sparkles,
+  UserCircle,
+  X,
+  ScrollText,
+} from 'lucide-react';
+import axiosClient from '../api/axiosClient.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
+import { useI18n } from '../i18n/useI18n.js';
+import { UserRole } from '../utils/constants.js';
 
+const desktopLinkClasses =
+  'flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-all whitespace-nowrap';
+const mobileLinkClasses =
+  'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all';
 
-export function Navbar({ onNavigate, currentPage }) {
+const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
-  const [showMobileMenu, setShowMobileMenu] = React.useState(false);
-  const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const { lang, toggle } = useLanguage();
+  const { t } = useI18n();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      toast.success("Đã đăng xuất thành công!");
-      onNavigate("home");
-    } catch (error) {
-      console.error("Logout error:", error);
+  const tickerMessages = useMemo(
+    () => [
+      t('nav.ticker.default1', 'Email-only OTP across the entire platform.'),
+      t('nav.ticker.default2', 'All stats, notices, and listings are pulled from live data.'),
+    ],
+    [t],
+  );
+
+  const loadUnreadCount = useCallback(async () => {
+    if (!isAuthenticated || !user?.id) {
+      setUnreadCount(0);
+      return;
     }
+    try {
+      const { data } = await axiosClient.get('/notifications/unread-count', {
+        params: { userId: user.id },
+      });
+      setUnreadCount(data.data?.count ?? 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setUnreadCount(0);
+      return undefined;
+    }
+    loadUnreadCount();
+    const intervalId = setInterval(loadUnreadCount, 15000);
+    const handleRefresh = () => loadUnreadCount();
+    window.addEventListener('rentmate:notifications-updated', handleRefresh);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('rentmate:notifications-updated', handleRefresh);
+    };
+  }, [isAuthenticated, user?.id, loadUnreadCount]);
+
+  const navItems = useMemo(() => {
+    const items = [
+      { key: 'nav.home', fallback: 'Home', to: '/', icon: Home },
+      { key: 'nav.browse', fallback: 'Browse', to: '/properties', icon: Sparkles },
+    ];
+    if (isAuthenticated) {
+      items.push({
+        key: 'nav.messages',
+        fallback: 'Messages',
+        to: '/messages',
+        icon: MessageSquare,
+      });
+      items.push({
+        key: 'nav.favorites',
+        fallback: 'Favorites',
+        to: '/favorites',
+        icon: Sparkles,
+      });
+      items.push({
+        key: 'nav.payments',
+        fallback: 'Payments',
+        to: '/payments',
+        icon: BarChart3,
+      });
+      items.push({
+        key: 'nav.contracts',
+        fallback: 'Contracts',
+        to: '/contracts',
+        icon: ScrollText,
+      });
+      items.push({
+        key: 'nav.dashboard',
+        fallback: 'Dashboard',
+        to: '/dashboard',
+        icon: LayoutDashboard,
+      });
+      if (user?.role === UserRole.Tenant) {
+        items.push({
+          key: 'nav.applyLandlord',
+          fallback: 'Apply landlord',
+          to: '/apply-landlord',
+          icon: Shield,
+        });
+      }
+      if (user?.role === UserRole.Admin) {
+        items.push({
+          key: 'nav.admin',
+          fallback: 'Admin',
+          to: '/admin',
+          icon: BarChart3,
+        });
+      }
+    } else {
+      items.push({
+        key: 'nav.forLandlords',
+        fallback: 'For landlords',
+        to: '/dashboard',
+        icon: LayoutDashboard,
+      });
+    }
+    return items;
+  }, [isAuthenticated, user?.role]);
+
+  const renderNavLink = (item, variant = 'desktop') => {
+    const Icon = item.icon;
+    const baseClass = variant === 'desktop' ? desktopLinkClasses : mobileLinkClasses;
+    const activeClass =
+      variant === 'desktop'
+        ? 'bg-primary text-white shadow-soft-glow'
+        : 'bg-gray-100 text-brand';
+    const idleClass =
+      variant === 'desktop'
+        ? 'text-gray-600 hover:bg-gray-100 hover:text-brand'
+        : 'text-gray-600 hover:bg-gray-50';
+
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className={({ isActive }) =>
+          `${baseClass} ${isActive ? activeClass : idleClass} ${variant === 'desktop' ? '' : 'w-full'}`
+        }
+        onClick={() => setMobileOpen(false)}
+      >
+        {Icon && <Icon className="h-4 w-4" />}
+        <span>{t(item.key, item.fallback)}</span>
+      </NavLink>
+    );
   };
 
+  const renderAuthButtons = (variant = 'desktop') =>
+    isAuthenticated ? (
+      <>
+        <div
+          className={`${
+            variant === 'desktop'
+              ? 'hidden md:flex'
+              : 'flex w-full items-center justify-between rounded-2xl border border-gray-200 px-4 py-3'
+          } items-center gap-2 rounded-full bg-gray-50 text-xs font-medium text-gray-600`}
+        >
+          <UserCircle className="h-4 w-4 text-primary" />
+          <span className="truncate">
+            {user?.fullName || t('nav.signedInAs', 'Signed in as')}
+            {user?.role ? ` | ${user.role}` : ''}
+          </span>
+        </div>
+        <Link
+          to="/notifications"
+          className={`relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:text-primary ${
+            variant === 'desktop' ? '' : 'w-full justify-start px-4'
+          }`}
+          aria-label="Notifications"
+          onClick={() => setMobileOpen(false)}
+        >
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 min-w-[24px] rounded-full bg-danger px-1 text-center text-[10px] font-bold text-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+          {variant !== 'desktop' && (
+            <span className="ml-3 text-sm font-semibold">{t('nav.notification', 'Notifications')}</span>
+          )}
+        </Link>
+        <Link
+          to="/profile"
+          className={`rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary ${
+            variant === 'desktop' ? 'hidden sm:inline-flex' : 'w-full text-center'
+          }`}
+          onClick={() => setMobileOpen(false)}
+        >
+          {t('nav.profile', 'Profile')}
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            setMobileOpen(false);
+          }}
+          className={`rounded-full bg-gradient-to-r from-danger to-[#FF6B6B] px-4 py-2 text-sm font-semibold text-white shadow transition hover:opacity-95 ${
+            variant === 'desktop' ? '' : 'w-full text-center'
+          }`}
+        >
+          Log out
+        </button>
+      </>
+    ) : (
+      <>
+        <Link
+          to="/login"
+          className={`rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary ${
+            variant === 'desktop' ? 'hidden sm:inline-flex' : 'w-full text-center'
+          }`}
+          onClick={() => setMobileOpen(false)}
+        >
+          {t('nav.signIn', 'Sign in')}
+        </Link>
+        <Link
+          to="/register"
+          className={`rounded-full bg-gradient-to-r from-primary to-[#FFD400] px-4 py-2 text-sm font-semibold text-white shadow-soft-glow transition hover:opacity-90 ${
+            variant === 'desktop' ? '' : 'w-full text-center'
+          }`}
+          onClick={() => setMobileOpen(false)}
+        >
+          {t('nav.createAccount', 'Create account')}
+        </Link>
+      </>
+    );
+
   return (
-    <>
-      {/* Promo Ticker */}
-      <div className="bg-gradient-to-r from-[#0072BC] to-[#001F3F] text-white overflow-hidden">
-        <div className="animate-marquee whitespace-nowrap py-2">
-          <span className="inline-block px-8">
-            🎉 <strong>KHUYẾN MÃI ĐẶC BIỆT:</strong> Giảm ngay 1 tháng tiền nhà
-            khi ký hợp đồng 12 tháng!
+    <header className="sticky top-0 z-50">
+      <div className="ticker-gradient text-white">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-hidden px-4 py-2 sm:px-6 lg:px-8">
+          <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em]">
+            {t('nav.ticker.label', 'RentMate update')}
           </span>
-          <span className="inline-block px-8">
-            ⚡ Hỗ trợ 24/7 - Xem nhà miễn phí
-          </span>
-          <span className="inline-block px-8">
-            🏠 Hơn 10,000+ căn hộ chất lượng đang chờ bạn
-          </span>
+          <div className="relative flex-1 overflow-hidden">
+            <div className="animate-marquee">
+              {tickerMessages.map((message, index) => (
+                <span key={index} className="flex items-center gap-2 pr-8 text-sm text-white/90">
+                  <Sparkles className="h-4 w-4" />
+                  {message}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Main Navbar */}
-      <nav className="bg-white shadow-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <button
-              onClick={() => onNavigate("home")}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+      <nav className="bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3 py-3 lg:py-4">
+            <Link
+              to="/"
+              className="flex items-center gap-3 rounded-2xl px-3 py-2 text-lg font-semibold text-brand transition hover:opacity-90"
+              onClick={() => setMobileOpen(false)}
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-[#0072BC] to-[#FFD400] rounded-xl flex items-center justify-center">
-                <Home className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="font-heading text-xl text-[#001F3F]">
-                  RentMate
-                </span>
-                <span className="text-xs text-[#0072BC]">
-                  Nhà Trọ Thông Minh
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-soft-glow">
+                <Home className="h-5 w-5" />
+              </span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-base font-bold">RentMate</span>
+                <span className="text-xs text-gray-500">
+                  {t('hero.heading', 'Rent smarter with live data and verified email OTP.')}
                 </span>
               </div>
-            </button>
+            </Link>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
-              <button
-                onClick={() => onNavigate("home")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                  currentPage === "home"
-                    ? "bg-[#0072BC] text-white"
-                    : "hover:bg-gray-100 text-gray-700"
-                }`}
-              >
-                <Home className="w-4 h-4" />
-                <span>Trang Chủ</span>
-              </button>
+            <div className="ml-auto hidden items-center gap-3 md:flex">{renderAuthButtons('desktop')}</div>
 
-              {/* THÊM NÚT CHO THUÊ Ở ĐÂY */}
-              <button
-                onClick={() => onNavigate("rentals")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                  currentPage === "rentals"
-                    ? "bg-[#0072BC] text-white"
-                    : "hover:bg-gray-100 text-gray-700"
-                }`}
-              >
-                <Search className="w-4 h-4" /> {/* Hoặc icon khác phù hợp */}
-                <span>CHO THUÊ</span>
-              </button>
-
-              <button
-                onClick={() => onNavigate("landlord")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                  currentPage === "landlord"
-                    ? "bg-[#0072BC] text-white"
-                    : "hover:bg-gray-100 text-gray-700"
-                }`}
-              >
-                <Building2 className="w-4 h-4" />
-                <span>Cho Thuê Nhà</span> {/* Đổi tên cho rõ nghĩa */}
-              </button>
-
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-gray-100 text-gray-700 transition-all">
-                <MapPin className="w-4 h-4" />
-                <span>Khu Vực</span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-gray-100 text-gray-700 transition-all">
-                <Heart className="w-4 h-4" />
-                <span>Yêu Thích</span>
-              </button>
-            </div>
-
-            {/* Right Actions */}
-            <div className="hidden md:flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0072BC] text-[#0072BC] hover:bg-[#0072BC] hover:text-white transition-all">
-                <Phone className="w-4 h-4" />
-                <span>Hotline: 1900-1234</span>
-              </button>
-
-              {isAuthenticated && user ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-[#0072BC] to-[#001F3F] text-white hover:shadow-lg transition-all"
-                  >
-                    {user.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.fullName}
-                        className="w-6 h-6 rounded-full"
-                      />
-                    ) : (
-                      <User className="w-4 h-4" />
-                    )}
-                    <span>{user.fullName}</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-
-                  {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-900">
-                          {user.fullName}
-                        </p>
-                        <p className="text-xs text-gray-500">{user.role}</p>
-                      </div>
-                      {user.role === "landlord" && (
-                        <button
-                          onClick={() => {
-                            onNavigate("landlord");
-                            setShowUserMenu(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <Building2 className="w-4 h-4" />
-                          Dashboard
-                        </button>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Đăng Xuất
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={() => onNavigate("auth")}
-                  className="flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-[#0072BC] to-[#001F3F] text-white hover:shadow-lg transition-all"
-                >
-                  <User className="w-4 h-4" />
-                  <span>Đăng Nhập</span>
-                </button>
-              )}
-            </div>
-
-            {/* Mobile Menu Button */}
             <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              type="button"
+              className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 text-gray-700 md:hidden"
+              onClick={() => setMobileOpen((prev) => !prev)}
+              aria-label="Toggle navigation"
             >
-              <Menu className="w-6 h-6" />
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
 
-          {/* Mobile Menu */}
-          {showMobileMenu && (
-            <div className="md:hidden py-4 border-t">
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => {
-                    onNavigate("home");
-                    setShowMobileMenu(false);
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100"
-                >
-                  <Home className="w-5 h-5" />
-                  <span>Trang Chủ</span>
-                </button>
-                <button
-                  onClick={() => {
-                    onNavigate("landlord");
-                    setShowMobileMenu(false);
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100"
-                >
-                  <Building2 className="w-5 h-5" />
-                  <span>Cho Thuê</span>
-                </button>
-                <button className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100">
-                  <Heart className="w-5 h-5" />
-                  <span>Yêu Thích</span>
-                </button>
-                <button
-                  onClick={() => {
-                    onNavigate("auth");
-                    setShowMobileMenu(false);
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-[#0072BC] text-white mt-2"
-                >
-                  <User className="w-5 h-5" />
-                  <span>Đăng Nhập</span>
-                </button>
+          <div className="hidden flex-col gap-3 border-t border-gray-100/80 pb-4 pt-3 md:flex">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-x-auto">
+                {navItems.map((item) => renderNavLink(item, 'desktop'))}
               </div>
+              <button
+                type="button"
+                onClick={toggle}
+                className="flex items-center gap-1 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+              >
+                <Globe2 className="h-4 w-4" />
+                {lang === 'en' ? 'EN' : 'VI'}
+              </button>
             </div>
-          )}
+          </div>
         </div>
+
+        {mobileOpen && (
+          <div className="space-y-3 border-t border-gray-100 bg-white px-4 py-3 md:hidden">
+            {navItems.map((item) => renderNavLink(item, 'mobile'))}
+            <button
+              type="button"
+              onClick={() => {
+                toggle();
+                setMobileOpen(false);
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+            >
+              <Globe2 className="h-4 w-4" />
+              {lang === 'en' ? 'English' : 'Vietnamese'}
+            </button>
+            <div className="flex flex-col gap-2 pt-2">{renderAuthButtons('mobile')}</div>
+          </div>
+        )}
       </nav>
-    </>
+    </header>
   );
-}
+};
+
+export default Navbar;
+

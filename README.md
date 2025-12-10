@@ -40,13 +40,18 @@ docker-compose up -d
 
 ```powershell
 cd rentmate-backend
-cp .env.example .env  # update values if needed
+cp .env.example .env  # update values if needed; set a strong JWT_SECRET
 # Add GEMINI_API_KEY (Google AI Studio) and optionally GEMINI_MODEL (default: models/gemini-2.5-flash)
 npm install
 npm run start:dev
 ```
 
 API served at `http://localhost:3000/api`.
+
+### Email Delivery
+- Copy `rentmate-backend/.env.example` to `.env` and fill `MAIL_*` variables.
+- Gmail users must create a 16-character App Password (normal passwords are rejected with `535 Invalid login`). Follow `docs/email-setup.md`.
+- For development-only testing, Mailtrap credentials work out of the box and avoid sending real messages.
 
 ### Available Endpoints (Sprint 1)
 - `POST /api/auth/register`
@@ -72,6 +77,7 @@ API served at `http://localhost:3000/api`.
 - Landlords manage only their properties; admins have full control
 - Gemini-powered smart assistant that enriches answers with live data (contracts, transactions, listings)
 - Messages API persists every chat bubble for the floating chat box
+- Reset and payment tokens are stored hashed; checkout requires contract ownership; sensitive endpoints locked down
 
 ## 3. Frontend (React + Vite + TailwindCSS)
 
@@ -90,7 +96,7 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 - Protected routes (dashboard)
 - Responsive UI matching Sprint 1 design tokens (buttons, forms, property cards)
 - Property dashboard for landlords/admins with create form and listing overview
-- Floating “RentMate Virtual Assistant” chat widget for tenants (AI + owner chat modes)
+- Floating "RentMate Virtual Assistant" chat widget for tenants (AI + owner chat modes)
 
 ## 4. Docker Images
 - Backend Dockerfile located in `rentmate-backend/Dockerfile`
@@ -104,7 +110,8 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 5. Admin: access `/api/users` to review user base
 
 ## Notes
-- TypeORM `synchronize` is enabled for rapid prototyping; disable for production migrations.
-- JWT secret defaults to `supersecretkey` - override in `.env`.
+- TypeORM `synchronize` should stay `false` in production; run migrations or the provided DB patch instead of drop/create.
+- Set a strong `JWT_SECRET`; existing tokens are invalidated when it changes.
 - Ensure `GEMINI_API_KEY` is configured on the backend server (never expose it to the frontend).
-- Contracts, transactions, and AI chat modules now ship as part of this sprint; extend them with additional intents or analytics as needed.
+- Transactions list/detail are admin/manager-only; checkout requires the tenant/landlord of the contract.
+- Use `npm run db:patch:hashed-tokens` (backend) to add hashed token columns if your DB predates this change.

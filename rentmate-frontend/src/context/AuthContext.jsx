@@ -15,20 +15,47 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('rentmate_user');
-    const storedToken = localStorage.getItem('rentmate_token');
+
+    const storedUser =
+      localStorage.getItem('rentmate_user') ||
+      sessionStorage.getItem('rentmate_user');
+    const storedToken =
+      localStorage.getItem('rentmate_token') ||
+      sessionStorage.getItem('rentmate_token');
+
     if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
       setToken(storedToken);
     }
   }, []);
 
-  const login = useCallback((nextUser, nextToken) => {
-    localStorage.setItem('rentmate_user', JSON.stringify(nextUser));
-    localStorage.setItem('rentmate_token', nextToken);
+
+  const persist = useCallback((key, value, remember = true) => {
+    const storage = remember ? localStorage : sessionStorage;
+    storage.setItem(key, value);
+  }, []);
+
+  const clearStorage = useCallback(() => {
+    localStorage.removeItem('rentmate_user');
+    localStorage.removeItem('rentmate_token');
+    localStorage.removeItem('rentmate_token_expires');
+    sessionStorage.removeItem('rentmate_user');
+    sessionStorage.removeItem('rentmate_token');
+    sessionStorage.removeItem('rentmate_token_expires');
+  }, []);
+
+  const login = useCallback((nextUser, nextToken, options = {}) => {
+    const remember = options.remember !== false;
+    clearStorage();
+    persist('rentmate_user', JSON.stringify(nextUser), remember);
+    persist('rentmate_token', nextToken, remember);
+    if (options.expiresAt) {
+      persist('rentmate_token_expires', options.expiresAt, remember);
+    }
     setUser(nextUser);
     setToken(nextToken);
-  }, []);
+  }, [clearStorage, persist]);
+
 
   const refreshUser = useCallback(async () => {
     if (!token || !user?.id) {
@@ -38,11 +65,14 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axiosClient.get(`/users/${user.id}`);
       const updatedUser = data.data;
       setUser(updatedUser);
-      localStorage.setItem('rentmate_user', JSON.stringify(updatedUser));
+
+      const remember = Boolean(localStorage.getItem('rentmate_token'));
+      persist('rentmate_user', JSON.stringify(updatedUser), remember);
     } catch {
       // ignore refresh errors
     }
-  }, [token, user?.id]);
+  }, [token, user?.id, persist]);
+
 
   const logout = useCallback(async () => {
     try {
@@ -50,12 +80,13 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       // logout endpoint is a stub; ignore errors
     } finally {
-      localStorage.removeItem('rentmate_user');
-      localStorage.removeItem('rentmate_token');
+
+      clearStorage();
       setUser(null);
       setToken(null);
     }
-  }, []);
+  }, [clearStorage]);
+
 
   const value = useMemo(
     () => ({

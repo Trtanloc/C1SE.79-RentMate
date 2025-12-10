@@ -1,9 +1,13 @@
-FROM node:18-alpine
+FROM node:20-alpine
+
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm install --omit=dev
-COPY tsconfig*.json nest-cli.json ./
-COPY src ./src
-RUN npm run build
+
+RUN npm install --legacy-peer-deps
+
+COPY . .
+
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+
+CMD ["npm", "run", "start:dev"]
