@@ -1,4 +1,10 @@
 node_modules
-npm-debug.log
 dist
+npm-debug.log
 .env
+mysql-data          
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+.dockerignore

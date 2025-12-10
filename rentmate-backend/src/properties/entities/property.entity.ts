@@ -15,6 +15,7 @@ import { PropertyType } from '../../common/enums/property-type.enum';
 import { Contract } from '../../contracts/entities/contract.entity';
 import { PropertyPhoto } from './property-photo.entity';
 import { PropertyAmenity } from './property-amenity.entity';
+import { DepositContract } from '../../deposit/entities/deposit-contract.entity';
 
 @Entity({ name: 'properties' })
 @Index('IDX_PROPERTY_SLUG', ['slug'], { unique: true })
@@ -58,6 +59,9 @@ export class Property {
 
   @Column({ length: 120 })
   country: string;
+
+  @Column({ length: 120 })
+  ward: string;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   price: number;
@@ -110,6 +114,9 @@ export class Property {
 
   @OneToMany(() => Contract, (contract) => contract.property)
   contracts: Contract[];
+
+  @OneToMany(() => DepositContract, (contract) => contract.property)
+  depositContracts: DepositContract[];
 
   @CreateDateColumn()
   createdAt: Date;

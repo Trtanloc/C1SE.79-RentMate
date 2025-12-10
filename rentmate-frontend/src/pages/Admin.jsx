@@ -8,6 +8,202 @@ import {
 import { useMetadata } from '../context/MetadataContext.jsx';
 import { useI18n } from '../i18n/useI18n.js';
 
+// Import component mới
+const AdminDepositConfirmation = () => {
+  const [deposits, setDeposits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(null);
+
+  useEffect(() => {
+    loadWaitingDeposits();
+    const interval = setInterval(loadWaitingDeposits, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadWaitingDeposits = async () => {
+    try {
+      const { data } = await axiosClient.get('/deposit/admin/waiting-confirmation');
+      setDeposits(data?.data || []);
+    } catch (err) {
+      console.error('Failed to load waiting deposits:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async (contractCode) => {
+    if (!confirm('Xác nhận đã nhận được tiền đặt cọc từ người thuê?')) return;
+    
+    setConfirming(contractCode);
+    try {
+      await axiosClient.post(`/deposit/confirm/${contractCode}`);
+      alert('✅ Đã xác nhận thanh toán thành công!');
+      await loadWaitingDeposits();
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Lỗi khi xác nhận thanh toán');
+    } finally {
+      setConfirming(null);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
+          <span className="ml-3 text-gray-600">Đang tải...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            💰 Đặt cọc chờ xác nhận
+            {deposits.length > 0 && (
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-500 text-white text-sm font-bold animate-pulse">
+                {deposits.length}
+              </span>
+            )}
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Người thuê đã chuyển tiền, vui lòng kiểm tra và xác nhận
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={loadWaitingDeposits}
+          className="rounded-full bg-gray-100 p-2 hover:bg-gray-200 transition-colors"
+          title="Làm mới"
+        >
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
+
+      {deposits.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">✅</div>
+          <p className="text-lg text-gray-600 font-medium">Không có đặt cọc nào chờ xác nhận</p>
+          <p className="text-sm text-gray-500 mt-2">Tất cả giao dịch đã được xử lý</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {deposits.map((deposit) => (
+            <div
+              key={deposit.id}
+              className="border-2 border-orange-200 rounded-2xl p-5 bg-gradient-to-r from-orange-50 to-yellow-50 hover:shadow-lg transition-shadow"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Mã hợp đồng</p>
+                    <p className="text-lg font-bold text-gray-800">{deposit.contract_code}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Người thuê</p>
+                      <p className="font-semibold text-gray-800">
+                        {deposit.tenant?.fullName || 'N/A'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {deposit.tenant?.phone || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Bất động sản</p>
+                      <p className="font-semibold text-gray-800">
+                        {deposit.property?.title || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 pt-2 border-t border-orange-200">
+                    <div className="bg-white rounded-xl px-4 py-2 border-2 border-orange-300">
+                      <p className="text-xs text-gray-500">Số tiền đặt cọc</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {formatCurrency(deposit.deposit_amount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Thời gian chuyển tiền</p>
+                      <p className="text-sm font-medium text-gray-700">
+                        {formatDate(deposit.paid_at || deposit.updated_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                      {deposit.payment_method === 'momo' ? '💳 MoMo' : '🏦 Chuyển khoản'}
+                    </span>
+                    <span className="text-xs px-3 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold animate-pulse">
+                      ⏳ Chờ xác nhận
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleConfirm(deposit.contract_code)}
+                    disabled={confirming === deposit.contract_code}
+                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  >
+                    {confirming === deposit.contract_code ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        Đang xử lý...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        ✅ Xác nhận đã nhận tiền
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(`/payment/${deposit.contract_code}`, '_blank');
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Xem chi tiết →
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPage = () => {
   const {
     landlordApplicationStatuses,
@@ -132,43 +328,6 @@ const AdminPage = () => {
       .slice(0, 5);
   }, [userHighlights, users]);
 
-  const applicationBreakdown = useMemo(() => {
-    if (!applications.length) {
-      return [];
-    }
-    const counts = applications.reduce((acc, app) => {
-      const key = app.status || LandlordApplicationStatus.Pending;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    const total = applications.length;
-    const colorFromMeta = (meta = {}) => {
-      const badge = meta.badgeClass || '';
-      if (badge.includes('emerald')) return '#10B981';
-      if (badge.includes('amber')) return '#F59E0B';
-      if (badge.includes('rose')) return '#EF4444';
-      return '#0072BC';
-    };
-    return Object.keys(counts).map((status) => {
-      const meta = landlordStatusMeta[status] || {};
-      return {
-        status,
-        label: meta.label || status,
-        count: counts[status],
-        percent: total ? Math.round((counts[status] / total) * 100) : 0,
-        color: colorFromMeta(meta),
-      };
-    });
-  }, [applications, landlordStatusMeta]);
-
-  const listingProgress = useMemo(() => {
-    if (!overview) return null;
-    const total = Number(overview.totalListings) || 0;
-    const active = Number(overview.activeListings) || 0;
-    const percent = total ? Math.round((active / total) * 100) : 0;
-    return { total, active, percent };
-  }, [overview]);
-
   return (
     <section className="mx-auto max-w-6xl px-4 py-10">
       <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
@@ -182,9 +341,6 @@ const AdminPage = () => {
           <p className="text-sm text-gray-500">
             {t('admin.subheading', 'Monitor listings, users, and landlord onboarding powered by backend data.')}
           </p>
-        </div>
-        <div className="rounded-full bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-500">
-          {t('admin.ticker', 'Email OTP only — SMS is disabled globally')}
         </div>
       </header>
 
@@ -200,8 +356,9 @@ const AdminPage = () => {
         </div>
       ) : (
         <>
+          {/* Overview Stats */}
           {overview && (
-            <div className="grid gap-4 rounded-2xl bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 rounded-2xl bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4 mb-6">
               {[
                 {
                   label: t('admin.overview.totalListings', 'Total listings'),
@@ -232,219 +389,13 @@ const AdminPage = () => {
             </div>
           )}
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2 rounded-2xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {t('admin.charts.title', 'Operational charts')}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {t('admin.charts.subtitle', 'Live breakdown from landlord applications.')}
-                  </p>
-                </div>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  {t('admin.charts.apps', 'Applications')}
-                </span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {applicationBreakdown.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    {t('admin.charts.noData', 'No application data yet.')}
-                  </p>
-                ) : (
-                  applicationBreakdown.map((item) => (
-                    <div key={item.status} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-sm font-semibold text-gray-700">
-                        <span>{item.label}</span>
-                        <span className="text-xs text-gray-500">
-                          {item.count} • {item.percent}%
-                        </span>
-                      </div>
-                      <div className="h-3 overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${item.percent}%`,
-                            background: `linear-gradient(90deg, ${item.color}, ${item.color}CC)`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+          {/* ========== THÊM PHẦN DEPOSIT CONFIRMATION VÀO ĐÂY ========== */}
+          <div className="mb-8">
+            <AdminDepositConfirmation />
+          </div>
+          {/* ============================================================= */}
 
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {t('admin.charts.listings', 'Listings health')}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {t('admin.charts.occupancy', 'Active vs total plus occupancy.')}
-                  </p>
-                </div>
-              </div>
-              {listingProgress ? (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
-                        {t('admin.overview.activeListings', 'Active listings')}
-                      </p>
-                      <p className="text-2xl font-semibold text-gray-800">
-                        {listingProgress.active} / {listingProgress.total}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                      {listingProgress.percent}%
-                    </span>
-                  </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary to-[#00A8E8]"
-                      style={{ width: `${Math.min(listingProgress.percent, 100)}%` }}
-                    />
-                  </div>
-                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
-                    {t('admin.overview.occupancy', 'Occupancy')}:{' '}
-                    <span className="font-semibold text-brand">
-                      {overview?.occupancyRate ?? '--'}%
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-gray-500">
-                  {t('admin.charts.noData', 'No application data yet.')}
-                </p>
-              )}
-            </div>
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Doanh thu theo tháng
-              </h3>
-              <p className="text-sm text-gray-500">
-                Dữ liệu từ giao dịch hoàn tất.
-              </p>
-              <div className="mt-4 space-y-2">
-                {dashboardStats?.revenueByMonth?.length ? (
-                  dashboardStats.revenueByMonth.map((row) => (
-                    <div key={row.month} className="flex items-center justify-between text-sm">
-                      <span>{row.month}</span>
-                      <span className="font-semibold text-gray-800">
-                        {Number(row.total).toLocaleString('vi-VN')} VND
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-gray-500">Chưa có dữ liệu thanh toán.</p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          <section className="mt-8 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {t('admin.users.activeLandlords', 'Active landlords')}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {t('admin.users.activeLandlordsHint', 'Landlords with live or recently updated listings.')}
-                  </p>
-                </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  {landlordUsers.length}
-                </span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {landlordUsers.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    {t('admin.users.noLandlords', 'No active landlords yet.')}
-                  </p>
-                ) : (
-                  landlordUsers.map((landlord) => (
-                    <div
-                      key={landlord.id}
-                      className="rounded-xl border border-gray-100 p-3 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            {landlord.fullName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {landlord.email}
-                          </p>
-                        </div>
-                        <div className="text-right text-xs text-gray-600">
-                          <p className="font-semibold text-emerald-700">
-                            {landlord.activeListingCount ?? 0} active
-                          </p>
-                          <p>
-                            {t('admin.users.totalListings', 'Total listings')}: {landlord.propertyCount ?? 0}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {t('admin.users.featuredTenants', 'Featured tenants')}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {t('admin.users.featuredTenantsHint', 'Tenants with the most completed or active contracts.')}
-                  </p>
-                </div>
-                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-primary">
-                  {tenantUsers.length}
-                </span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {tenantUsers.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    {t('admin.users.noTenants', 'No standout tenants yet.')}
-                  </p>
-                ) : (
-                  tenantUsers.map((tenant) => (
-                    <div
-                      key={tenant.id}
-                      className="rounded-xl border border-gray-100 p-3 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            {tenant.fullName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {tenant.email}
-                          </p>
-                        </div>
-                        <div className="text-right text-xs text-gray-600">
-                          <p className="font-semibold text-primary">
-                            {tenant.completedContracts ?? 0} contracts
-                          </p>
-                          <p className="text-gray-500">
-                            {t('admin.users.role', 'Tenant')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </section>
-
+          {/* Landlord Applications */}
           <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -512,11 +463,11 @@ const AdminPage = () => {
                             {application.user?.email}
                           </p>
                         </td>
-                      <td className="px-3 py-3">{application.companyName}</td>
-                      <td className="px-3 py-3">
+                        <td className="px-3 py-3">{application.companyName}</td>
+                        <td className="px-3 py-3">
                           {application.experienceYears} years
-                      </td>
-                      <td className="px-3 py-3">{application.propertyCount}</td>
+                        </td>
+                        <td className="px-3 py-3">{application.propertyCount}</td>
                         <td className="px-3 py-3">
                           <span
                             className={`rounded-full border px-2 py-1 text-xs font-semibold ${meta.badgeClass}`}
@@ -575,47 +526,6 @@ const AdminPage = () => {
                   })}
                 </tbody>
               </table>
-            </div>
-          </section>
-
-          <section className="mt-8 grid gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {t('admin.tenants', 'Recent tenants')}
-              </h2>
-              <ul className="mt-4 space-y-3">
-                {tenantUsers.map((tenant) => (
-                  <li
-                    key={tenant.id}
-                    className="rounded-xl border border-gray-100 px-3 py-2 text-sm"
-                  >
-                    <p className="font-semibold">{tenant.fullName}</p>
-                    <p className="text-xs text-gray-500">{tenant.email}</p>
-                  </li>
-                ))}
-                {tenantUsers.length === 0 && (
-                  <p className="text-sm text-gray-500">No tenants yet.</p>
-                )}
-              </ul>
-            </div>
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {t('admin.landlords', 'Active landlords')}
-              </h2>
-              <ul className="mt-4 space-y-3">
-                {landlordUsers.map((landlord) => (
-                  <li
-                    key={landlord.id}
-                    className="rounded-xl border border-gray-100 px-3 py-2 text-sm"
-                  >
-                    <p className="font-semibold">{landlord.fullName}</p>
-                    <p className="text-xs text-gray-500">{landlord.email}</p>
-                  </li>
-                ))}
-                {landlordUsers.length === 0 && (
-                  <p className="text-sm text-gray-500">No landlords yet.</p>
-                )}
-              </ul>
             </div>
           </section>
         </>

@@ -20,17 +20,22 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ClassSerializerInterceptor(reflector));
 
   const rawOrigins = configService.get<string>('CORS_ORIGIN');
-  const allowlist = rawOrigins
-    ? rawOrigins
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : ['http://localhost:5173'];
+const allowlist = rawOrigins
+  ? rawOrigins
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  : ['http://localhost:5173'];
 
-  app.enableCors({
-    origin: allowlist,
-    credentials: true,
-  });
+
+if (!allowlist.includes('http://localhost:5174')) {
+  allowlist.push('http://localhost:5174');
+}
+
+app.enableCors({
+  origin: allowlist,
+  credentials: true,
+});
 
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);

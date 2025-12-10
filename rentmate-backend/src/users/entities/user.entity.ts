@@ -12,6 +12,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { Contract } from '../../contracts/entities/contract.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { LandlordApplication } from '../../landlord-applications/entities/landlord-application.entity';
+import { DepositContract } from '../../deposit/entities/deposit-contract.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -39,6 +40,18 @@ export class User {
 
   @Column({ length: 80, nullable: true, unique: true })
   facebookId?: string;
+
+  @Column({ length: 20, nullable: true })
+  idNumber?: string;
+
+  @Column({ length: 255, nullable: true })
+  address?: string;
+
+  @Column({ length: 50, nullable: true })
+  bankAccount?: string;
+
+  @Column({ length: 100, nullable: true })
+  bankName?: string;
 
   @Column({
     type: 'enum',
@@ -76,4 +89,10 @@ export class User {
     (application) => application.user,
   )
   landlordApplications: LandlordApplication[];
+
+  @OneToMany(() => DepositContract, (contract) => contract.tenant)
+  tenantDepositContracts: DepositContract[];
+
+  @OneToMany(() => DepositContract, (contract) => contract.landlord)
+  landlordDepositContracts: DepositContract[];
 }

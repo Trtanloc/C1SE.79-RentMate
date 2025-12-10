@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/useI18n.js';
 import { resolveAssetUrl } from '../utils/assets.js';
 import { fetchReviewsByProperty, createReview } from '../api/reviewsApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import DepositButton from '../components/DepositButton.jsx';
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -373,6 +374,14 @@ const PropertyDetail = () => {
                 'Contact the landlord to schedule a viewing or request more information.',
               )}
             </p>
+            {isAuthenticated && user?.role === 'tenant' && (
+              <DepositButton
+                propertyId={property.id}
+                landlordId={property.ownerId}
+                propertyTitle={property.title}
+                landlordName={property.owner?.fullName || 'Chủ nhà'}
+              />
+            )}
             <button
               className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white transition hover:bg-primary/90"
               type="button"

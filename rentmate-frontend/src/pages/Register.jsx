@@ -173,7 +173,6 @@ const Register = () => {
     const url = `${apiBase}/auth/facebook?state=${encodeURIComponent(state)}&returnUrl=${encodeURIComponent('/dashboard')}`;
     window.location.href = url;
   };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitError(null);

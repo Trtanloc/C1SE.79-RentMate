@@ -19,6 +19,7 @@ import MessagesPage from './pages/Messages.jsx';
 import ContractsPage from './pages/Contracts.jsx';
 import ContractPreviewPage from './pages/ContractPreview.jsx';
 import AuthSuccess from './pages/AuthSuccess.jsx';
+import PaymentPage from './pages/PaymentPage.jsx';
 import { UserRole } from './utils/constants.js';
 
 const App = () => {
@@ -27,12 +28,17 @@ const App = () => {
       <Navbar />
       <main>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/properties" element={<PropertyList />} />
           <Route path="/properties/:id" element={<PropertyDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/auth/success" element={<AuthSuccess />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/payment/:contractCode" element={<PaymentPage />} />
+
+          {/* Protected Routes */}
           <Route
             path="/dashboard"
             element={
@@ -66,22 +72,6 @@ const App = () => {
             }
           />
           <Route
-            path="/contracts/:id/preview"
-            element={
-              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
-                <ContractPreviewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/contracts"
-            element={
-              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
-                <ContractsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/profile"
             element={
               <ProtectedRoute>
@@ -97,7 +87,22 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route
+            path="/contracts"
+            element={
+              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
+                <ContractsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contracts/:id/preview"
+            element={
+              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
+                <ContractPreviewPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/apply-landlord"
             element={
@@ -114,6 +119,8 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Catch all route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

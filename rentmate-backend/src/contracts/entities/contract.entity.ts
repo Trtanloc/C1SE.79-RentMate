@@ -52,6 +52,7 @@ export class Contract {
   @Column()
   ownerId: number;
 
+  // Giữ lại để frontend vẫn dùng landlordId như cũ (tương thích 100%)
   @Expose()
   get landlordId(): number {
     return this.ownerId;
@@ -100,8 +101,11 @@ export class Contract {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  // QUAN HỆ VỚI TRANSACTION – GIỮ NGUYÊN
   @OneToMany(() => Transaction, (transaction) => transaction.contract, {
     cascade: false,
   })
   transactions: Transaction[];
+
+ 
 }
