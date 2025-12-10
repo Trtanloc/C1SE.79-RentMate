@@ -6,6 +6,11 @@ import { PropertyStatus } from '../common/enums/property-status.enum';
 import { PropertyType, propertyTypeLabels } from '../common/enums/property-type.enum';
 import { NotificationType } from '../common/enums/notification-type.enum';
 import { LandlordApplicationStatus } from '../common/enums/landlord-application-status.enum';
+import {
+  VIETNAM_PROVINCES,
+  findDistrictByCode,
+  findProvinceByCode,
+} from '../common/constants/vietnam-locations';
 
 type LabeledValue<T extends string> = {
   value: T;
@@ -36,6 +41,35 @@ export class MetadataService {
       districts,
       countries,
     };
+  }
+
+  getProvinces() {
+    return VIETNAM_PROVINCES.map((province) => ({
+      code: province.code,
+      name: province.name,
+    }));
+  }
+
+  getDistricts(provinceCode: string) {
+    const province = findProvinceByCode(provinceCode);
+    if (!province) {
+      return [];
+    }
+    return province.districts.map((district) => ({
+      code: district.code,
+      name: district.name,
+    }));
+  }
+
+  getWards(districtCode: string) {
+    const district = findDistrictByCode(districtCode);
+    if (!district) {
+      return [];
+    }
+    return district.wards.map((ward) => ({
+      code: ward.code,
+      name: ward.name,
+    }));
   }
 
   private async getDistinctStringColumn(column: keyof Property): Promise<string[]> {

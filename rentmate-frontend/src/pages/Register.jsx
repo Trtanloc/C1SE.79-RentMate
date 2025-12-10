@@ -54,10 +54,9 @@ const Register = () => {
 
     if (!trimmedName) {
       nextErrors.fullName = 'Full name is required';
-    } else if (!/^[A-Za-z\\s]+$/.test(trimmedName) || trimmedName.length < 2) {
+    } else if (!/^[A-Za-zÀ-ỹ\s]{2,}$/.test(trimmedName)) {
       nextErrors.fullName = 'Use at least 2 alphabetic characters';
     }
-
     const emailValue = values.email.trim();
     if (!emailValue) {
       nextErrors.email = 'Email is required';
@@ -69,9 +68,8 @@ const Register = () => {
     if (!phoneValue) {
       nextErrors.phone = 'Phone number is required';
     } else {
-      const hasOnlyValidChars = /^[+\\d\\s()-]+$/.test(phoneValue);
-      const digitCount = phoneValue.replace(/\\D/g, '').length;
-      if (!hasOnlyValidChars || digitCount < 7 || digitCount > 15) {
+      const cleaned = phoneValue.replace(/\D/g, '');
+      if (!/^0\d{9}$/.test(cleaned)) {
         nextErrors.phone = 'Enter a valid phone number';
       }
     }

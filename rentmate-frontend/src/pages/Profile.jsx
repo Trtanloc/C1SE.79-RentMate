@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { resolveAssetUrl } from '../utils/assets.js';
 
 const ProfilePage = () => {
   const { user, login } = useAuth();
@@ -87,6 +88,8 @@ const ProfilePage = () => {
       setSaving(false);
     }
   };
+
+  const avatarPreview = useMemo(() => resolveAssetUrl(form.avatarUrl), [form.avatarUrl]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -207,6 +210,13 @@ const ProfilePage = () => {
                 onChange={handleChange}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
+              {avatarPreview && (
+                <img
+                  src={avatarPreview}
+                  alt="Avatar preview"
+                  className="mt-2 h-16 w-16 rounded-full object-cover"
+                />
+              )}
             </div>
           </div>
           <div>

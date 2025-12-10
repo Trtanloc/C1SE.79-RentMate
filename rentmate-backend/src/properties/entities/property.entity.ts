@@ -57,6 +57,9 @@ export class Property {
   @Column({ length: 120 })
   district: string;
 
+  @Column({ length: 120, nullable: true })
+  ward?: string;
+
   @Column({ length: 120 })
   country: string;
 

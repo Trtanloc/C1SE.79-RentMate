@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
 
 const assetBaseCandidate =
   import.meta.env.VITE_ASSET_BASE_URL ||
@@ -6,7 +6,11 @@ const assetBaseCandidate =
 
 export const assetBaseUrl = assetBaseCandidate.replace(/\/$/, '');
 
-export const resolveAssetUrl = (url) => {
+export const resolveAssetUrl = (raw) => {
+  const url =
+    typeof raw === 'string'
+      ? raw
+      : raw?.image_path || raw?.path || raw?.url || raw?.href || '';
   if (!url) {
     return null;
   }

@@ -6,6 +6,7 @@ import {
   landlordApplicationStatusMeta as landlordStatusFallback,
 } from '../utils/constants.js';
 import { useMetadata } from '../context/MetadataContext.jsx';
+import { useI18n } from '../i18n/useI18n.js';
 
 const defaultForm = {
   companyName: '',
@@ -18,6 +19,7 @@ const defaultForm = {
 const LandlordApplicationPage = () => {
   const { user, refreshUser } = useAuth();
   const { landlordApplicationStatuses, landlordStatusMeta } = useMetadata();
+  const { t } = useI18n();
   const statusMeta = landlordStatusMeta || landlordStatusFallback;
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
@@ -47,7 +49,7 @@ const LandlordApplicationPage = () => {
     } catch (error) {
       const message =
         error.response?.data?.message ||
-        'Unable to load your landlord application.';
+        t('landlord.status.error', 'Unable to load your landlord application.');
       setLoadError(Array.isArray(message) ? message.join(', ') : message);
     } finally {
       setLoading(false);
@@ -61,31 +63,42 @@ const LandlordApplicationPage = () => {
   const validate = (values) => {
     const nextErrors = {};
     if (!values.companyName.trim()) {
-      nextErrors.companyName = 'Business name is required';
+      nextErrors.companyName = t('landlord.validation.company', 'Business name is required');
     }
     if (
       Number.isNaN(Number(values.experienceYears)) ||
       values.experienceYears < 0 ||
       values.experienceYears > 50
     ) {
-      nextErrors.experienceYears = 'Experience must be between 0 and 50 years';
+      nextErrors.experienceYears = t(
+        'landlord.validation.experience',
+        'Experience must be between 0 and 50 years',
+      );
     }
     if (
       Number.isNaN(Number(values.propertyCount)) ||
       values.propertyCount < 1 ||
       values.propertyCount > 200
     ) {
-      nextErrors.propertyCount = 'Portfolio size must be between 1 and 200 properties';
+      nextErrors.propertyCount = t(
+        'landlord.validation.count',
+        'Portfolio size must be between 1 and 200 properties',
+      );
     }
     if (!values.motivation.trim() || values.motivation.trim().length < 20) {
-      nextErrors.motivation =
-        'Describe your portfolio and goals (at least 20 characters).';
+      nextErrors.motivation = t(
+        'landlord.validation.goal',
+        'Describe your portfolio and goals (at least 20 characters).',
+      );
     }
     if (
       values.portfolioUrl &&
       !/^https?:\/\/\S+$/i.test(values.portfolioUrl.trim())
     ) {
-      nextErrors.portfolioUrl = 'Portfolio URL must be valid';
+      nextErrors.portfolioUrl = t(
+        'landlord.validation.portfolio',
+        'Portfolio URL must be valid',
+      );
     }
     return nextErrors;
   };
@@ -121,13 +134,14 @@ const LandlordApplicationPage = () => {
       });
       setApplication(data.data);
       setSubmitSuccess(
-        'Application submitted. Our team will review it soon.',
+        t('landlord.submit.success', 'Application submitted. Our team will review it soon.'),
       );
       setErrors({});
       setForm(defaultForm);
     } catch (error) {
       const message =
-        error.response?.data?.message || 'Unable to submit right now.';
+        error.response?.data?.message ||
+        t('landlord.submit.error', 'Unable to submit right now.');
       setSubmitError(Array.isArray(message) ? message.join(', ') : message);
     } finally {
       setIsSubmitting(false);
@@ -138,15 +152,17 @@ const LandlordApplicationPage = () => {
     if (user.role === 'landlord') {
       return (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800">
-          <p className="font-semibold">You already have landlord access.</p>
-          <p>Open the dashboard to create and manage listings.</p>
+          <p className="font-semibold">
+            {t('landlord.status.approved', 'You already have landlord access.')}
+          </p>
+          <p>{t('landlord.status.approvedHint', 'Open the dashboard to create and manage listings.')}</p>
         </div>
       );
     }
     if (loading) {
       return (
         <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-          Loading your application status...
+          {t('landlord.status.loading', 'Loading your application status...')}
         </div>
       );
     }
@@ -160,8 +176,12 @@ const LandlordApplicationPage = () => {
     if (!application) {
       return (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-800">
-          <p className="font-semibold">You have not submitted an application yet.</p>
-          <p>Complete the form below to request landlord access.</p>
+          <p className="font-semibold">
+            {t('landlord.status.none', 'You have not submitted an application yet.')}
+          </p>
+          <p>
+            {t('landlord.status.noneHint', 'Complete the form below to request landlord access.')}
+          </p>
         </div>
       );
     }
@@ -195,7 +215,7 @@ const LandlordApplicationPage = () => {
             onClick={() => setForm(defaultForm)}
             className="mt-4 rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5"
           >
-            Update details and reapply
+            {t('landlord.actions.update', 'Update details and reapply')}
           </button>
         )}
         <button
@@ -203,7 +223,7 @@ const LandlordApplicationPage = () => {
           onClick={refreshUser}
           className="mt-4 text-xs font-semibold text-primary underline"
         >
-          Refresh account status
+          {t('landlord.actions.refresh', 'Refresh account status')}
         </button>
       </div>
     );
@@ -213,13 +233,16 @@ const LandlordApplicationPage = () => {
     <section className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-          Become a landlord
+          {t('landlord.title', 'Become a landlord')}
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-gray-800">
-          Landlord application
+          {t('landlord.subtitle', 'Landlord application')}
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          Tell us about your portfolio so we can enable the landlord dashboard.
+          {t(
+            'landlord.lead',
+            'Tell us about your portfolio so we can enable the landlord dashboard.',
+          )}
         </p>
       </div>
 
@@ -229,7 +252,7 @@ const LandlordApplicationPage = () => {
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="grid gap-2">
             <label htmlFor="companyName" className="text-sm font-medium text-gray-700">
-              Business or personal brand
+              {t('landlord.form.company', 'Business or personal brand')}
             </label>
             <input
               id="companyName"
@@ -251,7 +274,7 @@ const LandlordApplicationPage = () => {
           </div>
           <div className="grid gap-2">
             <label htmlFor="portfolioUrl" className="text-sm font-medium text-gray-700">
-              Portfolio link (optional)
+              {t('landlord.form.portfolio', 'Portfolio link (optional)')}
             </label>
             <input
               id="portfolioUrl"
@@ -278,7 +301,7 @@ const LandlordApplicationPage = () => {
               htmlFor="experienceYears"
               className="text-sm font-medium text-gray-700"
             >
-              Years of rental experience
+              {t('landlord.form.experience', 'Years of rental experience')}
             </label>
             <input
               id="experienceYears"
@@ -304,7 +327,7 @@ const LandlordApplicationPage = () => {
               htmlFor="propertyCount"
               className="text-sm font-medium text-gray-700"
             >
-              Properties you plan to list
+              {t('landlord.form.count', 'Properties you plan to list')}
             </label>
             <input
               id="propertyCount"
@@ -328,7 +351,7 @@ const LandlordApplicationPage = () => {
         </div>
         <div className="mt-5 grid gap-2">
           <label htmlFor="motivation" className="text-sm font-medium text-gray-700">
-            Your goals
+            {t('landlord.form.goal', 'Your goals')}
           </label>
           <textarea
             id="motivation"
@@ -356,14 +379,16 @@ const LandlordApplicationPage = () => {
             disabled={!canSubmit || isSubmitting}
             className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit application'}
+            {isSubmitting
+              ? t('landlord.submit.loading', 'Submitting...')
+              : t('landlord.form.submit', 'Submit application')}
           </button>
           <button
             type="button"
             onClick={refreshUser}
             className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-100"
           >
-            Refresh profile
+            {t('landlord.actions.refresh', 'Refresh profile')}
           </button>
         </div>
       </form>

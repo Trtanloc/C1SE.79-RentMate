@@ -20,12 +20,18 @@ type FinancialInfo = {
   endDate?: string;
 };
 
+type PlatformInfo = PartyInfo & {
+  website?: string;
+  role?: string;
+};
+
 export type ContractTemplateData = {
   contractNumber: string;
   landlord: PartyInfo;
   tenant: PartyInfo;
   listing: ListingInfo;
   financial: FinancialInfo;
+  platform?: PlatformInfo;
   generatedAt?: string;
 };
 
@@ -64,6 +70,19 @@ export const buildContractHtml = (data: ContractTemplateData) => {
 
   const landlordName = escapeHtml(data.landlord.name || 'Bên A');
   const tenantName = escapeHtml(data.tenant.name || 'Bên B');
+  const platform = {
+    name: escapeHtml(data.platform?.name || 'RentMate'),
+    website: escapeHtml(data.platform?.website || process.env.APP_BASE_URL || 'https://rentmate.vn'),
+    email: escapeHtml(
+      data.platform?.email ||
+        process.env.MAIL_FROM?.replace(/.*<(.+)>/, '$1') ||
+        'support@rentmate.vn',
+    ),
+    phone: escapeHtml(data.platform?.phone || '—'),
+    role: escapeHtml(
+      data.platform?.role || 'Nền tảng RentMate giữ tiền cọc làm trung gian cho hai bên',
+    ),
+  };
 
   return `<!doctype html>
 <html lang="vi">
@@ -132,7 +151,7 @@ export const buildContractHtml = (data: ContractTemplateData) => {
       .footer {
         margin-top: 18px;
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 18px;
         text-align: center;
       }
@@ -183,6 +202,15 @@ export const buildContractHtml = (data: ContractTemplateData) => {
       </div>
 
       <div class="section">
+        <div class="section-title">Bên C - Nền tảng giữ cọc</div>
+        <div class="pair"><span class="pair-label">Tên nền tảng</span><span class="pair-value">${platform.name}</span></div>
+        <div class="pair"><span class="pair-label">Website</span><span class="pair-value">${platform.website}</span></div>
+        <div class="pair"><span class="pair-label">Email</span><span class="pair-value">${platform.email}</span></div>
+        <div class="pair"><span class="pair-label">Số điện thoại</span><span class="pair-value">${platform.phone}</span></div>
+        <div class="pair"><span class="pair-label">Vai trò</span><span class="pair-value">${platform.role}</span></div>
+      </div>
+
+      <div class="section">
         <div class="section-title">Thông tin bất động sản</div>
         <table>
           <tr>
@@ -214,12 +242,16 @@ export const buildContractHtml = (data: ContractTemplateData) => {
             <div class="pair"><span class="pair-label">Kết thúc</span><span class="pair-value">${formatDate(data.financial.endDate)}</span></div>
           </div>
         </div>
+        <p class="muted" style="margin-top:8px;">
+          Tiền cọc được chuyển vào Bên C (nền tảng) để giữ hộ và chỉ giải ngân khi Bên A và Bên B xác nhận bàn giao.
+        </p>
       </div>
 
       <div class="section">
         <div class="section-title">Điều khoản và cam kết chính</div>
         <ol class="clauses">
           <li>Bên B thanh toán đầy đủ và đúng hạn tiền thuê, tiền cọc theo thỏa thuận trên. Mọi khoản chậm thanh toán trên 05 ngày sẽ chịu lãi phạt 0.05%/ngày.</li>
+          <li>Tiền cọc của Bên B được chuyển vào Bên C (nền tảng) giữ hộ và chỉ giải ngân cho Bên A khi hai bên xác nhận bàn giao; nếu giao dịch hủy theo điều kiện thỏa thuận, Bên C hoàn trả cho bên có quyền nhận lại.</li>
           <li>Bên A bàn giao nhà/ căn hộ đúng tình trạng, đầy đủ trang thiết bị như mô tả và hỗ trợ đăng ký tạm trú theo quy định.</li>
           <li>Thời hạn hợp đồng được tính từ ngày bắt đầu đến ngày kết thúc. Hai bên có thể gia hạn bằng phụ lục hợp đồng trước ít nhất 30 ngày.</li>
           <li>Bên B không tự ý sửa chữa, thay đổi kết cấu, chuyển nhượng hoặc cho thuê lại nếu không có văn bản đồng ý của Bên A.</li>
@@ -246,6 +278,11 @@ export const buildContractHtml = (data: ContractTemplateData) => {
           <div class="sign-title">ĐẠI DIỆN BÊN B</div>
           <div class="hint">(Ký, ghi rõ họ tên)</div>
           <div style="margin-top:42px;font-weight:700;color:#0f172a;">${tenantName}</div>
+        </div>
+        <div class="sign-box">
+          <div class="sign-title">ĐẠI DIỆN BÊN C</div>
+          <div class="hint">(Ký, ghi rõ tên hoặc đóng dấu nền tảng)</div>
+          <div style="margin-top:42px;font-weight:700;color:#0f172a;">${platform.name}</div>
         </div>
       </div>
     </div>

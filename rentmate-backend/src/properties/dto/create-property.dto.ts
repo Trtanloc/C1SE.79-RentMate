@@ -15,9 +15,27 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { PropertyStatus } from '../../common/enums/property-status.enum';
 import { PropertyType } from '../../common/enums/property-type.enum';
 import { VIETNAM_CITY_VALUES } from '../../common/constants/vietnam-cities';
+
+const toStringArray = (value: unknown) => {
+  if (value === undefined || value === null) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item : String(item)))
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return undefined;
+};
 
 export class CreatePropertyDto {
   @IsString()
@@ -43,6 +61,11 @@ export class CreatePropertyDto {
   @IsString()
   @MaxLength(120)
   district: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  ward?: string;
 
   @IsString()
   @MaxLength(120)
@@ -92,6 +115,7 @@ export class CreatePropertyDto {
   @IsArray()
   @ArrayNotEmpty()
   @ArrayMaxSize(12)
+  @Transform(({ value }) => toStringArray(value))
   amenities?: string[];
 
   @IsOptional()
@@ -100,5 +124,6 @@ export class CreatePropertyDto {
   @ArrayMaxSize(12)
   @IsString({ each: true })
   @MaxLength(50, { each: true })
+  @Transform(({ value }) => toStringArray(value))
   photos?: string[];
 }
