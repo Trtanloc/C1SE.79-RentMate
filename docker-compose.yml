@@ -1,17 +1,42 @@
-version: "3.8"
 services:
   mysql:
-    image: mysql:8
+    image: mysql:8.0
     container_name: rentmate-mysql
-    restart: always
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: rentmate
-      MYSQL_USER: root
-      MYSQL_PASSWORD: 123456
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass123
     ports:
       - "3306:3306"
     volumes:
-      - ./mysql-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      timeout: 20s
+      retries: 10
+
+  app:
+    build: .
+    container_name: rentmate-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppass123
+      DB_DATABASE: rentmate
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run start:dev
+
 volumes:
   mysql-data:

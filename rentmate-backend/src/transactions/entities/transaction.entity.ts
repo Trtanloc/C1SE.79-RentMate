@@ -1,3 +1,4 @@
+// src/transactions/entities/transaction.entity.ts
 import {
   Column,
   CreateDateColumn,
@@ -5,6 +6,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Contract } from '../../contracts/entities/contract.entity';
 import { TransactionStatus } from '../../common/enums/transaction-status.enum';
@@ -63,10 +65,21 @@ export class Transaction {
   @Column({ type: 'timestamp', nullable: true })
   paidAt?: Date;
 
+  @Column({ type: 'int', nullable: true })
+  confirmedBy?: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  confirmedAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  confirmedByTenantAt?: Date;
+
   @Column({ type: 'text', nullable: true })
   metadata?: string;
 
   @CreateDateColumn()
   createdAt: Date;
-}
 
+  @UpdateDateColumn()
+  updatedAt: Date;
+}

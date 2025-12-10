@@ -15,17 +15,20 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
 
   useEffect(() => {
+
     const storedUser =
       localStorage.getItem('rentmate_user') ||
       sessionStorage.getItem('rentmate_user');
     const storedToken =
       localStorage.getItem('rentmate_token') ||
       sessionStorage.getItem('rentmate_token');
+
     if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
       setToken(storedToken);
     }
   }, []);
+
 
   const persist = useCallback((key, value, remember = true) => {
     const storage = remember ? localStorage : sessionStorage;
@@ -53,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     setToken(nextToken);
   }, [clearStorage, persist]);
 
+
   const refreshUser = useCallback(async () => {
     if (!token || !user?.id) {
       return;
@@ -61,6 +65,7 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axiosClient.get(`/users/${user.id}`);
       const updatedUser = data.data;
       setUser(updatedUser);
+
       const remember = Boolean(localStorage.getItem('rentmate_token'));
       persist('rentmate_user', JSON.stringify(updatedUser), remember);
     } catch {
@@ -68,17 +73,20 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token, user?.id, persist]);
 
+
   const logout = useCallback(async () => {
     try {
       await axiosClient.post('/auth/logout');
     } catch (error) {
       // logout endpoint is a stub; ignore errors
     } finally {
+
       clearStorage();
       setUser(null);
       setToken(null);
     }
   }, [clearStorage]);
+
 
   const value = useMemo(
     () => ({

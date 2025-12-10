@@ -13,6 +13,7 @@ export const PropertyStatus = {
   Pending: 'pending',
 };
 
+
 export const fallbackPropertyStatusMeta = {
   [PropertyStatus.Available]: {
     label: 'Available',
@@ -77,4 +78,5 @@ export const landlordApplicationStatusMeta = {
     label: 'Rejected',
     badgeClass: 'border-rose-200 bg-rose-50 text-rose-700',
   },
+
 };

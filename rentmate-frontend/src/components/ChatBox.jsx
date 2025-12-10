@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { toast } from 'sonner';
 
-/**
- * Floating AI-only chat box. Human-to-human chat is now on /messages page.
- */
 const ChatBox = () => {
   const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -12,12 +10,13 @@ const ChatBox = () => {
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const scrollRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, isOpen]);
+    if (!messagesEndRef.current) return; // <-- ĐỔI scrollRef thành messagesEndRef
+  messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
+}, [messages, isOpen]);
+
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -70,8 +69,8 @@ const ChatBox = () => {
     const baseBubbleStyles = isTenant
       ? 'bg-blue-600 text-white self-end rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl'
       : isAssistant
-        ? 'bg-white text-gray-900 border border-gray-200 self-start rounded-tr-2xl rounded-br-2xl rounded-tl-2xl'
-        : 'bg-emerald-100 text-emerald-900 self-start rounded-xl';
+      ? 'bg-white text-gray-900 border border-gray-200 self-start rounded-tr-2xl rounded-br-2xl rounded-tl-2xl'
+      : 'bg-emerald-100 text-emerald-900 self-start rounded-xl';
 
     return (
       <div key={message.id ?? `${message.senderType}-${message.createdAt}`}>
@@ -106,7 +105,7 @@ const ChatBox = () => {
     return (
       <>
         <div
-          ref={scrollRef}
+          ref={messagesEndRef}
           className="flex max-h-64 flex-col gap-3 overflow-y-auto py-2"
         >
           {messages.length === 0 ? (

@@ -28,7 +28,7 @@ export class MailerService {
       (user ? `RentMate <${user}>` : undefined);
 
     const isGmailHost = host.includes('gmail');
-    if (isGmailHost && pass && !/^[A-Za-z0-9]{16}$/.test(pass)) {
+    if (isGmailHost && pass && !/^[A-Za-z0-9]{16}$/.test(pass.replace(/\s+/g, ''))) {
       this.logger.warn(
         'Gmail SMTP detected but MAIL_PASS is not a 16-character App Password. Follow the steps in ' +
           emailDocsPath +

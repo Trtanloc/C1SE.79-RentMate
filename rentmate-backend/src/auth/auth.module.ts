@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { VerificationCodesModule } from '../verification-codes/verification-codes.module';
 import { PasswordResetsModule } from '../password-resets/password-resets.module';
+import { MailerModule } from '../mail/mailer.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { PasswordResetsModule } from '../password-resets/password-resets.module'
         };
       },
     }),
+    MailerModule,
+    VerificationCodesModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard],

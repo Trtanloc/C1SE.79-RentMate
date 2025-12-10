@@ -1,0 +1,494 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hợp Đồng Đặt Cọc - DC1764952874148_O48UKZD2X</title>
+    <style>
+        /* Reset và base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', serif;
+            line-height: 1.5;
+            color: #000;
+            background: #fff;
+            padding: 0;
+            margin: 0;
+            font-size: 13pt;
+        }
+
+        /* Page setup cho A4 */
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+
+        .page {
+            width: 21cm;
+            min-height: 29.7cm;
+            padding: 2cm;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px double #000;
+        }
+
+        .title {
+            font-size: 18pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 14pt;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .contract-code {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #2c5282;
+        }
+
+        /* Content sections */
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        /* Parties info */
+        .parties {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .party {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+
+        .party-title {
+            font-weight: bold;
+            font-size: 13pt;
+            margin-bottom: 15px;
+            color: #2d3748;
+            text-align: center;
+        }
+
+        .info-item {
+            margin-bottom: 8px;
+            display: flex;
+        }
+
+        .info-label {
+            min-width: 150px;
+            font-weight: bold;
+        }
+
+        .info-value {
+            flex: 1;
+        }
+
+        /* Property info */
+        .property-info {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* Payment info */
+        .payment-info {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .amount-highlight {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2b6cb0;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .amount-in-words {
+            font-style: italic;
+            color: #4a5568;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        /* Terms and conditions */
+        .terms {
+            margin-bottom: 30px;
+        }
+
+        .term-item {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        .term-number {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        /* Signatures */
+        .signatures {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .signature-box {
+            text-align: center;
+        }
+
+        .signature-title {
+            font-weight: bold;
+            margin-bottom: 40px;
+            font-size: 13pt;
+        }
+
+        .signature-line {
+            border-top: 1px solid #000;
+            margin: 60px 0 15px;
+        }
+
+        .signature-name {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 10pt;
+            color: #718096;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+        }
+
+        /* Watermark */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 80px;
+            color: rgba(0, 0, 0, 0.05);
+            z-index: -1;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* Verification */
+        .verification {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f7fafc;
+            border: 1px dashed #cbd5e0;
+            border-radius: 5px;
+        }
+
+        /* Responsive cho in ấn */
+        @media print {
+            body {
+                font-size: 12pt;
+            }
+
+            .page {
+                padding: 0;
+                margin: 0;
+                width: 100%;
+                height: 100%;
+            }
+
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- Watermark -->
+        <div class="watermark">RENTMATE</div>
+
+        <!-- Header -->
+        <div class="header">
+            <div class="title">HỢP ĐỒNG ĐẶT CỌC THUÊ NHÀ</div>
+            <div class="subtitle">(Hợp đồng điện tử có giá trị pháp lý)</div>
+            <div class="contract-code">Mã hợp đồng: DC1764952874148_O48UKZD2X</div>
+            <div>Ngày lập: 05/12/2025 23:41</div>
+        </div>
+
+        <!-- Các bên tham gia -->
+        <div class="section">
+            <div class="section-title">THÔNG TIN CÁC BÊN</div>
+            <div class="parties">
+                <!-- Bên cho thuê -->
+                <div class="party">
+                    <div class="party-title">BÊN CHO THUÊ (BÊN A)</div>
+                    <div class="info-item">
+                        <div class="info-label">Họ và tên:</div>
+                        <div class="info-value">Trần Thị Landlord</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Số điện thoại:</div>
+                        <div class="info-value">0902000002</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Email:</div>
+                        <div class="info-value">landlord@example.com</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">Tài khoản ngân hàng:</div>
+                        <div class="info-value">N/A - N/A</div>
+                    </div>
+                    
+                </div>
+
+                <!-- Bên thuê -->
+                <div class="party">
+                    <div class="party-title">BÊN THUÊ (BÊN B)</div>
+                    <div class="info-item">
+                        <div class="info-label">Họ và tên:</div>
+                        <div class="info-value">Nguyễn Văn Tenant</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Số điện thoại:</div>
+                        <div class="info-value">0901000001</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Email:</div>
+                        <div class="info-value">tenant@example.com</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">CMND/CCCD:</div>
+                        <div class="info-value">N/A</div>
+                    </div>
+                    
+                    
+                    <div class="info-item">
+                        <div class="info-label">Địa chỉ:</div>
+                        <div class="info-value">N/A</div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+
+        <!-- Thông tin tài sản -->
+        <div class="property-info">
+            <div class="section-title" style="margin-top: 0;">THÔNG TIN TÀI SẢN CHO THUÊ</div>
+            <div class="info-item">
+                <div class="info-label">Địa chỉ:</div>
+                <div class="info-value">1231213, N/A, 1213121, Ho Chi Minh City</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Loại tài sản:</div>
+                <div class="info-value">dhong ha</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Diện tích:</div>
+                <div class="info-value">40 m²</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Số phòng ngủ:</div>
+                <div class="info-value">2</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Số phòng tắm:</div>
+                <div class="info-value">1</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Giá thuê/tháng:</div>
+                <div class="info-value">1.211.222 ₫</div>
+            </div>
+        </div>
+
+        <!-- Thông tin thanh toán -->
+        <div class="payment-info">
+            <div class="section-title" style="margin-top: 0;">THÔNG TIN ĐẶT CỌC</div>
+
+            <div class="amount-highlight">
+                Số tiền đặt cọc: 222.222 ₫
+            </div>
+
+            <div class="amount-in-words">
+                (Bằng chữ: hai trăm hai mươi hai nghìn hai trăm hai mươi hai đồng)
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Phương thức thanh toán:</div>
+                <div class="info-value">
+                    Ví điện tử MoMo
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Mã giao dịch:</div>
+                <div class="info-value">TEST_1764952881038</div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Thời gian thanh toán:</div>
+                <div class="info-value">05/12/2025 23:41</div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Trạng thái:</div>
+                <div class="info-value" style="color: #38a169; font-weight: bold;">
+                    ✓ Đã thanh toán thành công
+                </div>
+            </div>
+        </div>
+
+        <!-- Điều khoản và điều kiện -->
+        <div class="terms">
+            <div class="section-title">ĐIỀU KHOẢN VÀ ĐIỀU KIỆN</div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 1:</span>
+                Bên B đồng ý đặt cọc số tiền 222.222 ₫ để giữ chỗ thuê tài sản nêu trên
+                trong thời hạn 07 (bảy) ngày làm việc kể từ ngày ký hợp đồng này.
+            </div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 2:</span>
+                Bên A cam kết không cho người khác thuê, chuyển nhượng hoặc thực hiện bất kỳ giao dịch nào liên quan đến tài sản
+                trong thời gian Bên B đặt cọc.
+            </div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 3:</span>
+                Điều kiện hoàn trả tiền cọc:
+                <div style="margin-left: 20px; margin-top: 5px;">
+                    <div>a) Nếu Bên B hủy đặt cọc trước 24 giờ: Hoàn 100% tiền cọc.</div>
+                    <div>b) Nếu Bên B hủy đặt cọc sau 24 giờ: Hoàn 50% tiền cọc.</div>
+                    <div>c) Nếu đã ký hợp đồng thuê chính thức: Tiền cọc được chuyển thành tiền cọc theo hợp đồng thuê.</div>
+                </div>
+            </div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 4:</span>
+                Nếu Bên A vi phạm điều 2 và không thể giao tài sản cho Bên B:
+                Bên A phải hoàn trả 200% số tiền đặt cọc cho Bên B.
+            </div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 5:</span>
+                Tiền cọc sẽ được khấu trừ vào tiền thuê tháng đầu tiên khi ký hợp đồng thuê chính thức.
+            </div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 6:</span>
+                Hợp đồng này có hiệu lực kể từ thời điểm thanh toán thành công và có giá trị pháp lý như hợp đồng giấy.
+            </div>
+
+            <div class="term-item">
+                <span class="term-number">Điều 7:</span>
+                Mọi tranh chấp phát sinh từ hợp đồng này sẽ được giải quyết thông qua thương lượng.
+                Nếu không thương lượng được, sẽ đưa ra Tòa án có thẩm quyền tại nơi có tài sản.
+            </div>
+        </div>
+
+        <!-- Xác thực -->
+        <div class="verification">
+            <div style="font-weight: bold; margin-bottom: 10px;">MÃ XÁC THỰC HỢP ĐỒNG</div>
+            <div style="font-family: monospace; font-size: 11pt; letter-spacing: 1px; margin: 10px 0;">
+                REMXNZY0OTUYODC0
+            </div>
+            <div style="font-size: 10pt; color: #718096;">
+                Sử dụng mã này để xác thực hợp đồng trên hệ thống RentMate
+            </div>
+        </div>
+
+        <!-- Chữ ký -->
+        <div class="signatures">
+            <div class="signature-box">
+                <div class="signature-title">BÊN CHO THUÊ<br>(BÊN A)</div>
+                <div class="signature-line"></div>
+                <div style="margin-top: 5px; font-size: 11pt;">(Ký, ghi rõ họ tên)</div>
+                <div class="signature-name">Trần Thị Landlord</div>
+            </div>
+
+            <div class="signature-box">
+                <div class="signature-title">BÊN THUÊ<br>(BÊN B)</div>
+                <div class="signature-line"></div>
+                <div style="margin-top: 5px; font-size: 11pt;">(Ký, ghi rõ họ tên)</div>
+                <div class="signature-name">Nguyễn Văn Tenant</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div>Hợp đồng được tạo tự động bởi hệ thống RentMate</div>
+            <div>Địa chỉ hệ thống: https://rentmate.example.com</div>
+            <div>Hotline: 1900 1234 • Email: support@rentmate.com</div>
+            <div style="margin-top: 10px; font-size: 9pt;">
+                Hợp đồng điện tử được ký số có giá trị pháp lý theo Luật Giao dịch điện tử 2005
+            </div>
+        </div>
+    </div>
+
+    <!-- Nút in (chỉ hiện trên web) -->
+    <div class="no-print" style="position: fixed; bottom: 20px; right: 20px;">
+        <button onclick="window.print()" style="
+            background: #2b6cb0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12pt;
+        ">
+            🖨️ In hợp đồng
+        </button>
+    </div>
+
+    <script>
+        // Thêm số trang nếu cần
+        window.onload = function() {
+            if (window.location.href.includes('print')) {
+                window.print();
+            }
+        };
+    </script>
+</body>
+</html>

@@ -8,6 +8,13 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
 
+    console.log('=== ENV VARIABLES ===');
+  console.log('MAIL_USER:', configService.get('MAIL_USER'));
+  console.log('MAIL_PASS:', configService.get('MAIL_PASS') ? '***SET***' : 'NOT SET');
+  console.log('MAIL_HOST:', configService.get('MAIL_HOST'));
+  console.log('MAIL_PORT:', configService.get('MAIL_PORT'));
+  console.log('====================');
+
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
@@ -20,17 +27,22 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ClassSerializerInterceptor(reflector));
 
   const rawOrigins = configService.get<string>('CORS_ORIGIN');
-  const allowlist = rawOrigins
-    ? rawOrigins
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : ['http://localhost:5173'];
+const allowlist = rawOrigins
+  ? rawOrigins
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  : ['http://localhost:5173'];
 
-  app.enableCors({
-    origin: allowlist,
-    credentials: true,
-  });
+
+if (!allowlist.includes('http://localhost:5174')) {
+  allowlist.push('http://localhost:5174');
+}
+
+app.enableCors({
+  origin: allowlist,
+  credentials: true,
+});
 
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);

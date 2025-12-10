@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+
 const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
@@ -13,6 +14,7 @@ axiosClient.interceptors.request.use((config) => {
   const token =
     localStorage.getItem('rentmate_token') ||
     sessionStorage.getItem('rentmate_token');
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -27,6 +29,7 @@ axiosClient.interceptors.response.use(
       localStorage.removeItem('rentmate_user');
       sessionStorage.removeItem('rentmate_token');
       sessionStorage.removeItem('rentmate_user');
+
     }
     return Promise.reject(error);
   },

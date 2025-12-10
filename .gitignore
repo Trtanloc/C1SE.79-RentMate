@@ -1,7 +1,25 @@
+# Dependencies
 node_modules/
+**/node_modules/
+
+# Env
+.env
+
+# Build
 dist/
 build/
-.env
+
+# Logs
 logs/
 *.log
 
+# Docker
+mysql-data/
+
+# Vite cache
+.vite/
+**/.vite/
+
+# IDE
+.vscode/
+.idea/

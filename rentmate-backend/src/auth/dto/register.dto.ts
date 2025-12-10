@@ -35,7 +35,7 @@ export class RegisterDto {
   @IsString()
   @MaxLength(20)
   @IsNotEmpty()
-  @Matches(/^[+\d\s()-]{7,20}$/, {
+  @Matches(/^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,3}[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,4}$/, {
     message: 'Phone must be a valid phone number',
   })
   phone: string;
