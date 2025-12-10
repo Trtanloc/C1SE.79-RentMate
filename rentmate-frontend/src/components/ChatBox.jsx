@@ -9,12 +9,14 @@ const ChatBox = () => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, isOpen]);
+    if (!messagesEndRef.current) return; // <-- ĐỔI scrollRef thành messagesEndRef
+  messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
+}, [messages, isOpen]);
+
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -103,7 +105,7 @@ const ChatBox = () => {
     return (
       <>
         <div
-          ref={scrollRef}
+          ref={messagesEndRef}
           className="flex max-h-64 flex-col gap-3 overflow-y-auto py-2"
         >
           {messages.length === 0 ? (
