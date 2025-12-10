@@ -44,7 +44,7 @@ const PaymentsPage = () => {
           amount: parseFloat(d.deposit_amount),
           currency: 'VND',
           status: d.status === 'waiting_confirmation' ? 'waiting_confirm' : d.status,
-          method: 'bank-transfer',
+          method: d.payment_method || 'bank-transfer',
           createdAt: d.created_at,
           type: 'deposit',
           property: d.property,
@@ -155,6 +155,25 @@ const PaymentsPage = () => {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+ //  HÀM FORMAT PHƯƠNG THỨC THANH TOÁN
+  const getPaymentMethodText = (method) => {
+    const methodMap = {
+      'momo': 'MoMo',
+      'vnpay': 'VN Pay',
+      'bank-transfer': 'Chuyển khoản ngân hàng',
+      'cash': 'Tiền mặt',
+      'online': 'Thanh toán online',
+      
+    };
+    return methodMap[method] || method;
+  };
+
+  // HÀM CHUNG ĐỂ LẤY PHƯƠNG THỨC HIỂN THỊ (TỐI ƯU HƠN)
+  const getPaymentMethodDisplay = (transaction) => {
+    // Ưu tiên lấy từ payment_method, nếu không có thì dùng method
+    const method = transaction.payment_method || transaction.method;
+    return getPaymentMethodText(method);
+  };
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString('vi-VN', {
@@ -174,7 +193,7 @@ const PaymentsPage = () => {
         sử dụng liên kết bảo mật.
       </p>
 
-      {/* ===== SECTION DEPOSIT CHỜ XÁC NHẬN (CHỈ HIỆN CHO ADMIN/LANDLORD) ===== */}
+      {/*SECTION DEPOSIT CHỜ XÁC NHẬN (CHỈ HIỆN CHO ADMIN/LANDLORD) */}
       {(isAdminOrManager || isLandlord) && deposits.length > 0 && (
         <div className="mt-6 rounded-2xl bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 p-6 shadow-lg">
           <div className="flex items-center justify-between mb-4">
@@ -290,7 +309,7 @@ const PaymentsPage = () => {
                       {getStatusText(tx.status)}
                     </span>
                     <span className="text-xs text-gray-500">
-                      Phương thức: {tx.method}
+                      Phương thức: {getPaymentMethodDisplay(tx)}
                     </span>
                     {tx.type === 'deposit' && (
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">
