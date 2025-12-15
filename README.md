@@ -115,3 +115,4 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 - Ensure `GEMINI_API_KEY` is configured on the backend server (never expose it to the frontend).
 - Transactions list/detail are admin/manager-only; checkout requires the tenant/landlord of the contract.
 - Use `npm run db:patch:hashed-tokens` (backend) to add hashed token columns if your DB predates this change.
+

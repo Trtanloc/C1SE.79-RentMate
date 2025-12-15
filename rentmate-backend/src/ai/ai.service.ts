@@ -3,6 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { buildConsistentPairwiseMatrix, computeAhpWeights } from './ahp';
+import {
+  computeTopsis,
+  CriterionDefinition,
+  DecisionAlternative,
+  TopsisComputationResult,
+} from './topsis';
+import { runKMeans } from './kmeans';
 import { Property } from '../properties/entities/property.entity';
 import { Contract } from '../contracts/entities/contract.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
@@ -34,6 +42,7 @@ type RecommendationFilters = {
   mentionsPrice: boolean;
   maxBudget?: number;
   city?: string;
+  requestedAmenities: string[];
   shouldSearch: boolean;
 };
 
@@ -45,11 +54,50 @@ type RankedProperty = {
   cluster: BudgetCluster;
 };
 
+type McdmCriterion =
+  | 'price_per_m2'
+  | 'distance_to_city'
+  | 'listing_age_days'
+  | 'area'
+  | 'bedrooms'
+  | 'bathrooms'
+  | 'amenities_match_ratio'
+  | 'owner_response_score'
+  | 'review_rating_avg'
+  | 'availability_flag';
+
+type PreparedRecord = {
+  property: Property;
+  cleanedPrice: number;
+  cleanedArea: number;
+  pricePerM2: number;
+  locationMatchScore: number;
+  distanceToCity: number;
+  listingAgeDays: number;
+  bedrooms: number;
+  bathrooms: number;
+  amenitiesMatchRatio: number;
+  ownerResponseScore: number;
+  reviewRatingAvg: number;
+  availabilityFlag: number;
+  logPrice: number;
+  propertyTypeCode: number;
+};
+
+type PreparedDataset = {
+  records: PreparedRecord[];
+  topsisAlternatives: Array<DecisionAlternative<McdmCriterion, PreparedRecord>>;
+  topsisCriteria: Array<CriterionDefinition<McdmCriterion>>;
+  clusterVectors: number[][];
+};
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   private readonly geminiModel: string;
+  private readonly mcdmCriteria: Array<CriterionDefinition<McdmCriterion>>;
+  private readonly ahpWeights: Record<McdmCriterion, number>;
 
   constructor(
     private readonly configService: ConfigService,
@@ -66,6 +114,8 @@ export class AiService {
     const defaultModel = 'models/gemini-2.5-flash';
     this.geminiModel =
       this.configService.get<string>('GEMINI_MODEL') ?? defaultModel;
+    this.mcdmCriteria = this.buildMcdmCriteria();
+    this.ahpWeights = this.computeCachedWeights();
   }
 
   private async ensureDatabaseConnection(options?: { skipLog?: boolean }) {
@@ -82,7 +132,7 @@ export class AiService {
     const trimmedMessage = chatRequestDto.message.trim();
     const conversationId = this.buildConversationId(user.id);
 
-     await this.ensureDatabaseConnection();
+    await this.ensureDatabaseConnection();
 
     await this.messagesService.logMessage({
       conversationId,
@@ -223,6 +273,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     };
   }
 
+
   private async gatherPropertyRecommendations(
     message: string,
   ): Promise<string | null> {
@@ -237,49 +288,62 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       const properties = await this.fetchCandidateProperties(filters);
       this.logger.log(`Retrieved ${properties.length} properties`);
 
-      if (!properties.length) {
-        return `Không có bất động sản phù hợp${
-          filters.city ? ` tại ${filters.city}` : ''
+      const dataset = this.prepareDataset(properties, filters);
+      if (!dataset.records.length) {
+        return `Kh?ng c? b?t d?ng s?n ph? h?p${
+          filters.city ? ` t?i ${filters.city}` : ''
         }${
           filters.maxBudget
-            ? ` với ngân sách ${this.formatCurrency(filters.maxBudget)}`
+            ? ` v?i ng?n s?ch ${this.formatCurrency(filters.maxBudget)}`
             : ''
         }.`;
       }
 
-      const ranked = this
-        .rankPropertiesWithMcdm(properties, filters)
+      const clusterMapping = this.clusterProperties(dataset);
+      const topsisResult = this.runTopsis(dataset);
+      const ranked = topsisResult.scores
+        .map((row) => {
+          const payload = row.payload as PreparedRecord;
+          const cluster =
+            clusterMapping.get(payload.property.id) ?? 'balanced';
+          return {
+            property: payload.property,
+            score: Number(row.score.toFixed(4)),
+            cluster,
+          };
+        })
         .slice(0, 3);
       const clusterSummary = this.describeClusterSummary(ranked);
 
       const lines = ranked.map((item, index) => {
-        const ownerName = item.property.owner?.fullName ?? 'Chưa cập nhật';
-        return `${index + 1}. ${item.property.title} (${item.property.address}) • ${this.formatCurrency(
+        const ownerName = item.property.owner?.fullName ?? 'Chua c?p nh?t';
+        return `${index + 1}. ${item.property.title} (${item.property.address})   ${this.formatCurrency(
           Number(item.property.price),
-        )}/tháng, diện tích ${item.property.area}m2, chủ nhà: ${ownerName}, Điểm MCDM: ${item.score}`;
+        )}/th?ng, di?n t?ch ${item.property.area}m2, ch? nh?: ${ownerName}, Di?m TOPSIS: ${item.score}, Cum: ${item.cluster}`;
       });
 
       return [
-        'Gợi ý bất động sản từ cơ sở dữ liệu + MCDM:',
+        'G?i y b?t d?ng s?n t? co s? d? li?u + TOPSIS (AHP + K-means):',
         ...lines,
         clusterSummary,
       ].join('\n');
     } catch (error) {
       this.logger.error('Failed to gather property recommendations', error);
-      return 'Chúng tôi tạm thời không truy vấn được dữ liệu bất động sản. Vui lòng thử lại sau.';
+      return 'Ch?ng t?i t?m th?i kh?ng truy v?n du?c d? li?u b?t d?ng s?n. Vui l?ng th? l?i sau.';
     }
   }
 
   private parseRecommendationFilters(message: string): RecommendationFilters {
     const normalized = message.toLowerCase();
     const mentionsProperty =
-      /(can ho|căn hộ|chung cu|apartment|nha thue|thuê nhà|property|bất động sản)/.test(
+      /(can ho|can h?|chung cu|apartment|nha thue|thu? nh?|property|bat dong san|b?t d?ng s?n)/.test(
         normalized,
       );
     const mentionsPrice =
-      /(giá|price|bao nhiêu|dưới|tầm|khoảng|budget)/.test(normalized);
+      /(gia|price|bao nhieu|duoi|tam|khoang|budget)/.test(normalized);
     const maxBudget = this.extractBudget(message);
     const city = this.extractCity(message);
+    const requestedAmenities = this.extractAmenities(message);
 
     return {
       normalized,
@@ -287,11 +351,13 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       mentionsPrice,
       maxBudget,
       city,
+      requestedAmenities,
       shouldSearch:
         mentionsProperty ||
         mentionsPrice ||
         typeof maxBudget === 'number' ||
-        Boolean(city),
+        Boolean(city) ||
+        requestedAmenities.length > 0,
     };
   }
 
@@ -301,6 +367,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     const query = this.propertyRepository
       .createQueryBuilder('property')
       .leftJoinAndSelect('property.owner', 'owner')
+      .leftJoinAndSelect('property.amenities', 'amenity')
       .where('property.status = :status', {
         status: PropertyStatus.Available,
       });
@@ -317,90 +384,205 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       });
     }
 
-    return query.orderBy('property.price', 'ASC').limit(10).getMany();
+    return query.orderBy('property.price', 'ASC').limit(20).getMany();
   }
 
-  private rankPropertiesWithMcdm(
+  private prepareDataset(
     properties: Property[],
     filters: RecommendationFilters,
-  ): RankedProperty[] {
-    if (!properties.length) {
-      return [];
+  ): PreparedDataset {
+    const valid = properties.filter((item) => item.price !== null && item.area !== null);
+    if (!valid.length) {
+      return {
+        records: [],
+        topsisAlternatives: [],
+        topsisCriteria: this.mcdmCriteria,
+        clusterVectors: [],
+      };
     }
 
-    const priceValues = properties.map((item) => Number(item.price));
-    const areaValues = properties.map((item) => Number(item.area));
-    const minPrice = Math.min(...priceValues);
-    const maxPrice = Math.max(...priceValues);
-    const minArea = Math.min(...areaValues);
-    const maxArea = Math.max(...areaValues);
-    const avgPrice =
-      priceValues.reduce((sum, value) => sum + value, 0) / priceValues.length;
+    const priceValues = valid.map((p) => Number(p.price));
+    const areaValues = valid.map((p) => Number(p.area));
+    const priceLower = this.computeQuantile(priceValues, 0.01);
+    const priceUpper = this.computeQuantile(priceValues, 0.99);
+    const areaLower = this.computeQuantile(areaValues, 0.01);
+    const areaUpper = this.computeQuantile(areaValues, 0.99);
 
-    return properties
-      .map((property) => {
-        const price = Number(property.price);
-        const normalizedPrice =
-          maxPrice === minPrice
-            ? 1
-            : 1 - (price - minPrice) / (maxPrice - minPrice);
-        const normalizedArea =
-          maxArea === minArea
-            ? 1
-            : (Number(property.area) - minArea) / (maxArea - minArea);
-        const locationAffinity = filters.city
-          ? this.computeLocationAffinity(property, filters.city)
-          : 0.5;
+    const records: PreparedRecord[] = valid.map((property) => {
+      const cleanedPrice = this.winsorize(Number(property.price), priceLower, priceUpper);
+      const cleanedArea = this.winsorize(Number(property.area), areaLower, areaUpper);
+      const pricePerM2 = cleanedArea === 0 ? 0 : cleanedPrice / cleanedArea;
+      const locationMatchScore = this.computeLocationMatchScore(property, filters.city);
+      const distanceToCity = Math.min(1, Math.max(0, 1 - locationMatchScore));
+      const amenitiesMatchRatio = this.computeAmenitiesMatch(property, filters.requestedAmenities);
+      const listingAgeDays = this.computeListingAgeDays(property);
+      const ownerResponseScore = 0;
+      const reviewRatingAvg = 0;
+      const availabilityFlag = property.status === PropertyStatus.Available ? 1 : 0;
+      const propertyTypeCode = this.encodePropertyType(property.type);
 
-        const weights = filters.maxBudget
-          ? { price: 0.5, area: 0.3, location: 0.2 }
-          : { price: 0.4, area: 0.4, location: 0.2 };
+      return {
+        property,
+        cleanedPrice,
+        cleanedArea,
+        pricePerM2,
+        locationMatchScore,
+        distanceToCity,
+        listingAgeDays,
+        bedrooms: Number(property.bedrooms ?? 0),
+        bathrooms: Number(property.bathrooms ?? 0),
+        amenitiesMatchRatio,
+        ownerResponseScore,
+        reviewRatingAvg,
+        availabilityFlag,
+        logPrice: Math.log1p(cleanedPrice),
+        propertyTypeCode,
+      };
+    });
 
-        const score =
-          normalizedPrice * weights.price +
-          normalizedArea * weights.area +
-          locationAffinity * weights.location;
+    const bounds = {
+      price_per_m2: this.computeRange(records.map((r) => r.pricePerM2)),
+      distance_to_city: this.computeRange(records.map((r) => r.distanceToCity)),
+      listing_age_days: this.computeRange(records.map((r) => r.listingAgeDays)),
+      area: this.computeRange(records.map((r) => r.cleanedArea)),
+      bedrooms: this.computeRange(records.map((r) => r.bedrooms)),
+      bathrooms: this.computeRange(records.map((r) => r.bathrooms)),
+      amenities_match_ratio: this.computeRange(records.map((r) => r.amenitiesMatchRatio)),
+      owner_response_score: this.computeRange(records.map((r) => r.ownerResponseScore)),
+      review_rating_avg: this.computeRange(records.map((r) => r.reviewRatingAvg)),
+      availability_flag: this.computeRange(records.map((r) => r.availabilityFlag)),
+    } as Record<McdmCriterion, { min: number; max: number }>;
 
-        return {
-          property,
-          score: Number(score.toFixed(4)),
-          cluster: this.assignCluster(price, {
-            budget: filters.maxBudget,
-            average: avgPrice,
-          }),
-        };
-      })
-      .sort((a, b) => b.score - a.score);
+    const topsisAlternatives = records.map((record) => ({
+      id: record.property.id,
+      values: {
+        price_per_m2: this.minMaxScale(
+          record.pricePerM2,
+          bounds.price_per_m2.min,
+          bounds.price_per_m2.max,
+        ),
+        distance_to_city: this.minMaxScale(
+          record.distanceToCity,
+          bounds.distance_to_city.min,
+          bounds.distance_to_city.max,
+        ),
+        listing_age_days: this.minMaxScale(
+          record.listingAgeDays,
+          bounds.listing_age_days.min,
+          bounds.listing_age_days.max,
+        ),
+        area: this.minMaxScale(record.cleanedArea, bounds.area.min, bounds.area.max),
+        bedrooms: this.minMaxScale(
+          record.bedrooms,
+          bounds.bedrooms.min,
+          bounds.bedrooms.max,
+        ),
+        bathrooms: this.minMaxScale(
+          record.bathrooms,
+          bounds.bathrooms.min,
+          bounds.bathrooms.max,
+        ),
+        amenities_match_ratio: this.minMaxScale(
+          record.amenitiesMatchRatio,
+          bounds.amenities_match_ratio.min,
+          bounds.amenities_match_ratio.max,
+        ),
+        owner_response_score: this.minMaxScale(
+          record.ownerResponseScore,
+          bounds.owner_response_score.min,
+          bounds.owner_response_score.max,
+        ),
+        review_rating_avg: this.minMaxScale(
+          record.reviewRatingAvg,
+          bounds.review_rating_avg.min,
+          bounds.review_rating_avg.max,
+        ),
+        availability_flag: this.minMaxScale(
+          record.availabilityFlag,
+          bounds.availability_flag.min,
+          bounds.availability_flag.max,
+        ),
+      },
+      payload: record,
+    }));
+
+    const clusterRaw = records.map((record) => [
+      record.logPrice,
+      record.cleanedArea,
+      record.amenitiesMatchRatio,
+      record.locationMatchScore,
+      record.bedrooms,
+      record.bathrooms,
+    ]);
+    const clusterVectors = this.buildZScoreVectors(clusterRaw);
+
+    return {
+      records,
+      topsisAlternatives,
+      topsisCriteria: this.mcdmCriteria,
+      clusterVectors,
+    };
   }
 
-  private computeLocationAffinity(property: Property, city: string): number {
-    const haystack = `${property.title} ${property.address}`.toLowerCase();
-    return haystack.includes(city.toLowerCase()) ? 1 : 0.3;
+  private runTopsis(
+    dataset: PreparedDataset,
+  ): TopsisComputationResult<McdmCriterion, PreparedRecord> {
+    return computeTopsis(
+      dataset.topsisCriteria,
+      dataset.topsisAlternatives,
+      this.ahpWeights,
+    );
   }
 
-  private assignCluster(
-    price: number,
-    stats: { budget?: number; average: number },
-  ): BudgetCluster {
-    const reference = stats.budget ?? stats.average;
-    if (!reference) {
-      return price <= stats.average ? 'balanced' : 'premium';
+  private clusterProperties(dataset: PreparedDataset): Map<number, BudgetCluster> {
+    if (!dataset.records.length) {
+      return new Map();
+    }
+    const { assignments, centroids } = runKMeans(dataset.clusterVectors, 3);
+    const labelMap = this.labelClusters(centroids);
+    const mapping = new Map<number, BudgetCluster>();
+
+    assignments.forEach((clusterIndex, idx) => {
+      const record = dataset.records[idx];
+      mapping.set(record.property.id, labelMap.get(clusterIndex) ?? 'balanced');
+    });
+
+    return mapping;
+  }
+
+  private labelClusters(centroids: number[][]): Map<number, BudgetCluster> {
+    const mapping = new Map<number, BudgetCluster>();
+    if (!centroids.length) {
+      return mapping;
     }
 
-    if (price <= reference * 0.8) {
-      return 'budget';
+    const sorted = centroids
+      .map((centroid, index) => ({ index, price: centroid[0] ?? 0 }))
+      .sort((a, b) => a.price - b.price);
+
+    if (sorted.length === 1) {
+      mapping.set(sorted[0].index, 'balanced');
+      return mapping;
     }
 
-    if (price <= reference * 1.05) {
-      return 'balanced';
+    if (sorted.length === 2) {
+      mapping.set(sorted[0].index, 'budget');
+      mapping.set(sorted[1].index, 'premium');
+      return mapping;
     }
 
-    return 'premium';
+    const labels: BudgetCluster[] = ['budget', 'balanced', 'premium'];
+    sorted.forEach((item, idx) => {
+      const label = labels[Math.min(idx, labels.length - 1)];
+      mapping.set(item.index, label);
+    });
+
+    return mapping;
   }
 
   private describeClusterSummary(ranked: RankedProperty[]): string {
     if (!ranked.length) {
-      return 'Không có dữ liệu phân cụm.';
+      return 'Khong co du lieu phan cum.';
     }
 
     const counts: Record<BudgetCluster, number> = {
@@ -414,16 +596,177 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     });
 
     const labels: Record<BudgetCluster, string> = {
-      budget: 'tiết kiệm',
-      balanced: 'cân bằng',
-      premium: 'cao cấp',
+      budget: 'tiet kiem',
+      balanced: 'can bang',
+      premium: 'cao cap',
     };
 
     const summary = (Object.keys(labels) as BudgetCluster[])
       .map((cluster) => `${labels[cluster]}: ${counts[cluster]}`)
       .join(' | ');
 
-    return `Phân cụm ngân sách (MCDM): ${summary}`;
+    return `Phan cum ngan sach (K-means): ${summary}`;
+  }
+
+  private computeLocationMatchScore(property: Property, city?: string): number {
+    if (!city) {
+      return 0.5;
+    }
+
+    const cityLower = city.toLowerCase();
+    const propertyCity = property.city?.toLowerCase() ?? '';
+    const propertyDistrict = property.district?.toLowerCase() ?? '';
+    const address = property.address?.toLowerCase() ?? '';
+
+    if (propertyCity === cityLower) {
+      return 1;
+    }
+
+    if (address.includes(cityLower) || propertyDistrict.includes(cityLower)) {
+      return 0.7;
+    }
+
+    return 0.2;
+  }
+
+  private encodePropertyType(type: Property['type']): number {
+    const ordering = ['apartment', 'condo', 'house', 'studio', 'office'];
+    const index = ordering.indexOf(String(type).toLowerCase());
+    return index === -1 ? 0 : index;
+  }
+
+  private computeAmenitiesMatch(
+    property: Property,
+    requested: string[],
+  ): number {
+    if (!requested.length) {
+      return 0;
+    }
+
+    const available = (property.amenities ?? [])
+      .map((item) => item.label?.toLowerCase().trim())
+      .filter(Boolean) as string[];
+
+    const matches = requested.filter((req) => available.includes(req.toLowerCase()));
+    return matches.length / requested.length;
+  }
+
+  private computeListingAgeDays(property: Property): number {
+    const createdAt = property.createdAt ? new Date(property.createdAt) : null;
+    if (!createdAt || Number.isNaN(createdAt.getTime())) {
+      return 0;
+    }
+
+    const diffMs = Date.now() - createdAt.getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  private computeQuantile(values: number[], quantile: number): number {
+    if (!values.length) {
+      return 0;
+    }
+    const sorted = [...values].sort((a, b) => a - b);
+    const pos = (sorted.length - 1) * quantile;
+    const lowerIndex = Math.floor(pos);
+    const upperIndex = Math.min(sorted.length - 1, lowerIndex + 1);
+    const fraction = pos - lowerIndex;
+    return sorted[lowerIndex] + fraction * (sorted[upperIndex] - sorted[lowerIndex]);
+  }
+
+  private winsorize(value: number, lower: number, upper: number): number {
+    if (Number.isNaN(value)) {
+      return 0;
+    }
+    return Math.min(Math.max(value, lower), upper);
+  }
+
+  private computeRange(values: number[]): { min: number; max: number } {
+    if (!values.length) {
+      return { min: 0, max: 0 };
+    }
+    return { min: Math.min(...values), max: Math.max(...values) };
+  }
+
+  private minMaxScale(value: number, min: number, max: number): number {
+    if (max === min) {
+      return 0.5;
+    }
+    return (value - min) / (max - min);
+  }
+
+  private buildZScoreVectors(matrix: number[][]): number[][] {
+    if (!matrix.length) {
+      return [];
+    }
+    const dimension = matrix[0].length;
+    const means = new Array(dimension).fill(0);
+    const stds = new Array(dimension).fill(0);
+
+    matrix.forEach((row) => {
+      row.forEach((value, idx) => {
+        means[idx] += value;
+      });
+    });
+    means.forEach((_, idx) => {
+      means[idx] /= matrix.length;
+    });
+
+    matrix.forEach((row) => {
+      row.forEach((value, idx) => {
+        const diff = value - means[idx];
+        stds[idx] += diff * diff;
+      });
+    });
+
+    stds.forEach((_, idx) => {
+      stds[idx] = Math.sqrt(stds[idx] / matrix.length);
+    });
+
+    return matrix.map((row) =>
+      row.map((value, idx) => this.zScore(value, means[idx], stds[idx])),
+    );
+  }
+
+  private zScore(value: number, mean: number, std: number): number {
+    if (std === 0) {
+      return 0;
+    }
+    return (value - mean) / std;
+  }
+
+  private buildMcdmCriteria(): Array<CriterionDefinition<McdmCriterion>> {
+    return [
+      { key: 'price_per_m2', type: 'cost' },
+      { key: 'distance_to_city', type: 'cost' },
+      { key: 'listing_age_days', type: 'cost' },
+      { key: 'area', type: 'benefit' },
+      { key: 'bedrooms', type: 'benefit' },
+      { key: 'bathrooms', type: 'benefit' },
+      { key: 'amenities_match_ratio', type: 'benefit' },
+      { key: 'owner_response_score', type: 'benefit' },
+      { key: 'review_rating_avg', type: 'benefit' },
+      { key: 'availability_flag', type: 'benefit' },
+    ];
+  }
+
+  private computeCachedWeights(): Record<McdmCriterion, number> {
+    const priorities: Record<McdmCriterion, number> = {
+      price_per_m2: 5,
+      amenities_match_ratio: 4,
+      distance_to_city: 4,
+      area: 3,
+      bedrooms: 2,
+      bathrooms: 2,
+      listing_age_days: 1,
+      owner_response_score: 2,
+      review_rating_avg: 2,
+      availability_flag: 5,
+    };
+
+    const keys = this.mcdmCriteria.map((criterion) => criterion.key);
+    const matrix = buildConsistentPairwiseMatrix(keys, priorities as Record<McdmCriterion, number>);
+    const { weights } = computeAhpWeights(keys, matrix);
+    return weights;
   }
   private async lookupLatestContractStatus(
     message: string,
@@ -503,6 +846,29 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 - Trạng thái: ${transaction.status}
 - Ngày thanh toán: ${paidAt}`;
   }
+
+  private extractAmenities(message: string): string[] {
+    const normalized = message.toLowerCase();
+    const keywords = [
+      { key: 'wifi', aliases: ['wifi', 'wi-fi'] },
+      { key: 'ac', aliases: ['ac', 'aircon', 'air conditioning', 'dieu hoa'] },
+      { key: 'parking', aliases: ['parking', 'do xe', 'garage'] },
+      { key: 'gym', aliases: ['gym', 'fitness'] },
+      { key: 'pool', aliases: ['pool', 'ho boi'] },
+      { key: 'elevator', aliases: ['elevator', 'thang may', 'lift'] },
+      { key: 'furnished', aliases: ['furnished', 'noi that'] },
+      { key: 'balcony', aliases: ['balcony', 'ban cong'] },
+    ];
+
+    const found = new Set<string>();
+    keywords.forEach((item) => {
+      if (item.aliases.some((alias) => normalized.includes(alias))) {
+        found.add(item.key);
+      }
+    });
+
+    return Array.from(found);
+  }
   private extractBudget(message: string): number | undefined {
     const budgetRegex =
       /(?:giá|dưới|under|tối đa|max|budget|khoảng)\D*(\d+(?:[.,]\d+)?)(?:\s*)(triệu|tr|million|tỷ|ty|nghìn|ngan|k)?/i;
@@ -567,9 +933,3 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     }).format(value);
   }
 }
-
-
-
-
-
-

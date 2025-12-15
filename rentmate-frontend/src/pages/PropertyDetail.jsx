@@ -8,6 +8,7 @@ import { resolveAssetUrl } from '../utils/assets.js';
 import { fetchReviewsByProperty, createReview } from '../api/reviewsApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import DepositButton from '../components/DepositButton.jsx';
+import { toGoogleMapsEmbedUrl } from '../utils/maps.js';
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -102,6 +103,10 @@ const PropertyDetail = () => {
     propertyStatusMeta[property.status]?.label ||
     fallbackPropertyStatusMeta[property.status]?.label ||
     property.status;
+  const mapEmbedSrc = toGoogleMapsEmbedUrl(
+    property.mapEmbedUrl,
+    property.address || property.title,
+  );
 
   const handleReviewSubmit = async (event) => {
     event.preventDefault();
@@ -417,14 +422,14 @@ const PropertyDetail = () => {
                 {property.owner.phone && <p>{property.owner.phone}</p>}
               </div>
             )}
-            {property.mapEmbedUrl && (
+            {mapEmbedSrc && (
               <div className="mt-4 space-y-2">
                 <p className="text-sm font-semibold text-gray-700">
                   Bản đồ / Tour 360
                 </p>
                 <div className="overflow-hidden rounded-xl border border-gray-200">
                   <iframe
-                    src={property.mapEmbedUrl}
+                    src={mapEmbedSrc}
                     title="Map preview"
                     className="h-52 w-full border-0"
                     allowFullScreen

@@ -154,8 +154,7 @@ export class TransactionsService {
       });
     }
 
-    await this.notificationsService.create({
-      userId: 1,
+    await this.notificationsService.notifyAdmins({
       title: 'Có thanh toán mới cần xác nhận',
       message,
       type: NotificationType.Transaction,

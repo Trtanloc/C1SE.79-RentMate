@@ -608,19 +608,18 @@ export class PdfService {
 
     try {
       // Launch browser với các options
-      browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-      });
+        browser = await puppeteer.launch({
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-first-run',
+            '--no-zygote'
+          ],
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+        });
 
       const page = await browser.newPage();
 

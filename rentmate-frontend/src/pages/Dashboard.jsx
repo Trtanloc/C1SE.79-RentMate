@@ -9,6 +9,7 @@ import { PropertyStatus, UserRole } from '../utils/constants.js';
 import { useI18n } from '../i18n/useI18n.js';
 import { fallbackCities, getCityLabel } from '../utils/cities.js';
 import { fetchProvinces, fetchDistricts, fetchWards } from '../api/locationApi.js';
+import { toGoogleMapsEmbedUrl } from '../utils/maps.js';
 
 const createEmptyForm = (defaults) => ({
   title: '',
@@ -453,8 +454,9 @@ const Dashboard = () => {
         formData.append('ward', form.ward.trim());
       }
       formData.append('country', form.country.trim());
-      if (form.mapEmbedUrl) {
-        formData.append('mapEmbedUrl', form.mapEmbedUrl.trim());
+      const mapUrl = toGoogleMapsEmbedUrl(form.mapEmbedUrl, form.address || form.title);
+      if (mapUrl) {
+        formData.append('mapEmbedUrl', mapUrl);
       }
       if (form.virtualTourUrl) {
         formData.append('virtualTourUrl', form.virtualTourUrl.trim());

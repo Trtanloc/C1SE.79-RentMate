@@ -6,12 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationType } from '../common/enums/notification-type.enum';
 import { User } from '../users/entities/user.entity';
 import { MailerService } from '../mail/mailer.service';
+import { UserRole } from '../common/enums/user-role.enum';
 
 type FindNotificationsOptions = {
   userId: number;
@@ -52,6 +53,38 @@ export class NotificationsService {
     }
 
     return notification;
+  }
+
+  /**
+   * Broadcast a notification to all admin/manager accounts.
+   * Returns list of created notifications (empty if no admin found).
+   */
+  async notifyAdmins(
+    payload: Omit<CreateNotificationDto, 'userId'>,
+  ): Promise<Notification[]> {
+    const admins = await this.usersRepository.find({
+      where: { role: In([UserRole.Admin, UserRole.Manager]) },
+    });
+
+    if (!admins.length) {
+      this.logger.warn('No admin accounts found to notify');
+      return [];
+    }
+
+    const notifications: Notification[] = [];
+    for (const admin of admins) {
+      const entity = this.notificationsRepository.create({
+        ...payload,
+        userId: admin.id,
+      });
+      const notification = await this.notificationsRepository.save(entity);
+      if (this.shouldSendEmail(notification.type)) {
+        await this.dispatchEmail(admin, notification);
+      }
+      notifications.push(notification);
+    }
+
+    return notifications;
   }
 
   findByUser({

@@ -51,7 +51,18 @@ export class LandlordApplicationsService {
       userId,
       status: LandlordApplicationStatus.Pending,
     });
-    return this.applicationsRepository.save(application);
+    const saved = await this.applicationsRepository.save(application);
+
+    // Thông báo cho admin/manager có hồ sơ mới cần duyệt
+    const applicantName = user.fullName || `User #${userId}`;
+    const applicantEmail = user.email || 'N/A';
+    await this.notificationsService.notifyAdmins({
+      title: 'Yêu cầu duyệt landlord mới',
+      message: `Ứng viên ${applicantName} (${applicantEmail}) vừa nộp hồ sơ landlord. Vui lòng duyệt trong trang quản trị.`,
+      type: NotificationType.System,
+    });
+
+    return saved;
   }
 
   findMine(userId: number): Promise<LandlordApplication | null> {
@@ -128,4 +139,3 @@ export class LandlordApplicationsService {
     });
   }
 }
-

@@ -103,6 +103,30 @@ const MessagesPage = () => {
 
   const currentConversation = conversations.find((c) => c.id === selectedId);
 
+  const getConversationName = useCallback(
+    (conversation) => {
+      if (!conversation) return '';
+      if (user?.role === 'tenant') {
+        return (
+          conversation.landlordName ||
+          (conversation.landlordId ? `Chu nha #${conversation.landlordId}` : 'Chu nha')
+        );
+      }
+      if (
+        user?.role === 'landlord' ||
+        user?.role === 'manager' ||
+        user?.role === 'admin'
+      ) {
+        return (
+          conversation.tenantName ||
+          (conversation.tenantId ? `Khach thue #${conversation.tenantId}` : 'Khach thue')
+        );
+      }
+      return conversation.propertyTitle || `BDS #${conversation.propertyId}`;
+    },
+    [user?.role],
+  );
+
   return (
     <section className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-4 flex items-center justify-between">
@@ -146,9 +170,9 @@ const MessagesPage = () => {
                         : 'hover:bg-gray-50'
                     }`}
                   >
-                    <p className="font-semibold">BĐS #{c.propertyId}</p>
+                    <p className="font-semibold">{getConversationName(c)}</p>
                     <p className="text-xs text-gray-500">
-                      {c.id.slice(0, 8)} · cập nhật {new Date(c.updatedAt).toLocaleString()}
+                      {(c.propertyTitle || `BDS #${c.propertyId}`) ?? ""} - Cap nhat {new Date(c.updatedAt).toLocaleString()}
                     </p>
                   </button>
                 </li>

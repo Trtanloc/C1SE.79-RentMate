@@ -684,15 +684,14 @@ async findByUser(userId: number, userRole: string) {
       }
     }
     
-    // Gửi notification cho admin
+    // Gửi notification cho admin/manager (không hard-code userId)
     try {
-      await this.notificationsService.create({
-        userId: 1, // Admin user ID
+      const created = await this.notificationsService.notifyAdmins({
         title: '💰 Có đặt cọc mới cần xác nhận',
         message,
         type: NotificationType.Transaction,
       });
-      this.logger.log('Đã gửi notification cho admin');
+      this.logger.log(`Đã gửi notification cho ${created.length} admin/manager`);
     } catch (error) {
       this.logger.error('Lỗi khi gửi notification cho admin:', error);
     }
