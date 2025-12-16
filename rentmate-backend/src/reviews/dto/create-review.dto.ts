@@ -1,9 +1,19 @@
-import { IsInt, IsOptional, IsPositive, IsString, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  IsIn,
+  Max,
+  Min,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateReviewDto {
+  @IsOptional()
   @IsInt()
   @IsPositive()
-  propertyId: number;
+  propertyId?: number;
 
   @IsOptional()
   @IsInt()
@@ -17,5 +27,23 @@ export class CreateReviewDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
+  reviewerName?: string;
+
+  @IsOptional()
+  @IsIn(['tenant', 'landlord'])
+  reviewerRole?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  avatarUrl?: string;
+
+  @IsOptional()
+  @IsString()
   comment?: string;
+
+  @IsOptional()
+  @IsString()
+  content?: string;
 }

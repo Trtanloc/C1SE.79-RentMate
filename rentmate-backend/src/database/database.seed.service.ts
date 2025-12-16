@@ -20,6 +20,7 @@ import { Message } from '../messages/entities/message.entity';
 import { MessageSender } from '../common/enums/message-sender.enum';
 import { Testimonial } from '../testimonials/entities/testimonial.entity';
 import { buildContractHtml } from '../contracts/templates/contract-template';
+import { normalizeVietnamese } from '../common/constants/vietnam-cities';
 
 type SeedProperty = {
   title: string;
@@ -216,6 +217,7 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
         status: PropertyStatus.Available,
         availableFrom: '2025-01-01',
         isFeatured: seed.isFeatured ?? false,
+        searchTextNormalized: this.normalizeSearchSeed(seed),
       });
 
       property.photos = photos.map((url, order) =>
@@ -434,6 +436,19 @@ export class DatabaseSeedService implements OnApplicationBootstrap {
     ];
 
     await this.testimonialsRepository.save(testimonialEntities);
+  }
+
+  private normalizeSearchSeed(seed: SeedProperty) {
+    const combined = [
+      seed.title,
+      seed.address,
+      seed.city,
+      seed.district,
+      seed.ward,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return normalizeVietnamese(combined);
   }
 
   private buildPropertySeeds(landlords: User[]): SeedProperty[] {

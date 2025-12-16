@@ -55,9 +55,10 @@ const PropertyList = () => {
       setLoading(true);
       setError(null);
       try {
+        const normalizedSearch = (search || '').trim().replace(/\s+/g, ' ');
         const { data } = await axiosClient.get('/properties', {
           params: {
-            search: search || undefined,
+            search: normalizedSearch || undefined,
             city: cityFilter || undefined,
             maxPrice: budgetFilter || undefined,
             type: typeFilter || undefined,

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, MoreThanOrEqual } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Property } from '../properties/entities/property.entity';
 import { User } from '../users/entities/user.entity';
 import { Contract } from '../contracts/entities/contract.entity';
@@ -26,45 +26,48 @@ export class StatsService {
     private readonly transactionsRepository: Repository<Transaction>,
   ) {}
 
-  async getOverview() {
+  private buildPropertyQuery(user?: User) {
+    const query = this.propertyRepository
+      .createQueryBuilder('property')
+      .where('property.status NOT IN (:...hiddenStatuses)', {
+        hiddenStatuses: [PropertyStatus.Deleted, PropertyStatus.Inactive],
+      });
+
+    if (user?.role === UserRole.Landlord) {
+      query.andWhere('property.ownerId = :ownerId', { ownerId: user.id });
+    }
+
+    return query;
+  }
+
+  async getOverview(user?: User) {
+    const role = user?.role ?? UserRole.Tenant;
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [
-      totalListings,
-      activeListings,
-      landlordCount,
-      tenantCount,
-      newListingsThisMonth,
-    ] = await Promise.all([
-      this.propertyRepository.count(),
-      this.propertyRepository.count({
-        where: { status: PropertyStatus.Available },
-      }),
-      this.userRepository.count({ where: { role: UserRole.Landlord } }),
-      this.userRepository.count({ where: { role: UserRole.Tenant } }),
-      this.propertyRepository.count({
-        where: {
-          createdAt: MoreThanOrEqual(startOfMonth),
-        },
-      }),
-    ]);
+    const baseQuery = this.buildPropertyQuery(user);
 
-    const contractsSigned = await this.contractRepository.count({
-      where: {
-        status: In([
-          ContractStatus.Signed,
-          ContractStatus.Active,
-          ContractStatus.Completed,
-        ]),
-      },
-    });
+    const activeListings = await baseQuery
+      .clone()
+      .andWhere('property.status = :availableStatus', {
+        availableStatus: PropertyStatus.Available,
+      })
+      .getCount();
 
-    const averagePriceRaw = await this.propertyRepository
-      .createQueryBuilder('property')
+    if (role === UserRole.Tenant) {
+      return { activeListings };
+    }
+
+    const totalListings = await baseQuery.clone().getCount();
+    const newListingsThisMonth = await baseQuery
+      .clone()
+      .andWhere('property.createdAt >= :startOfMonth', { startOfMonth })
+      .getCount();
+
+    const averagePriceRaw = await baseQuery
+      .clone()
       .select('COALESCE(AVG(property.price), 0)', 'avg')
       .getRawOne<{ avg: string }>();
-
     const averagePrice = Number(averagePriceRaw?.avg ?? 0);
 
     const occupancyRate =
@@ -76,6 +79,41 @@ export class StatsService {
               100
             ).toFixed(1),
           );
+
+    if (role === UserRole.Landlord) {
+      const contractsSigned = await this.contractRepository.count({
+        where: {
+          ownerId: user.id,
+          status: In([
+            ContractStatus.Signed,
+            ContractStatus.Active,
+            ContractStatus.Completed,
+          ]),
+        },
+      });
+      return {
+        totalListings,
+        activeListings,
+        contractsSigned,
+        averagePrice,
+        newListingsThisMonth,
+        occupancyRate,
+      };
+    }
+
+    const [landlordCount, tenantCount, contractsSigned] = await Promise.all([
+      this.userRepository.count({ where: { role: UserRole.Landlord } }),
+      this.userRepository.count({ where: { role: UserRole.Tenant } }),
+      this.contractRepository.count({
+        where: {
+          status: In([
+            ContractStatus.Signed,
+            ContractStatus.Active,
+            ContractStatus.Completed,
+          ]),
+        },
+      }),
+    ]);
 
     return {
       totalListings,
@@ -89,7 +127,7 @@ export class StatsService {
     };
   }
 
-  async getDashboard() {
+  async getDashboard(user?: User) {
     const [
       overview,
       revenueByMonth,
@@ -98,7 +136,7 @@ export class StatsService {
       adminCharts,
     ] =
       await Promise.all([
-        this.getOverview(),
+        this.getOverview(user),
         this.getRevenueByMonth(),
         this.getUsersByRole(),
         this.getListingsByCity(),
@@ -132,9 +170,13 @@ export class StatsService {
     };
   }
 
-  async getCategoryHighlights() {
+  async getCategoryHighlights(user?: User) {
+    const role = user?.role ?? UserRole.Tenant;
     const rows = await this.propertyRepository
       .createQueryBuilder('property')
+      .where('property.status NOT IN (:...hiddenStatuses)', {
+        hiddenStatuses: [PropertyStatus.Deleted, PropertyStatus.Inactive],
+      })
       .select('property.type', 'type')
       .addSelect('COUNT(property.id)', 'count')
       .addSelect('AVG(property.price)', 'avgPrice')
@@ -165,7 +207,12 @@ export class StatsService {
     return Object.values(PropertyType).map((type) => {
       const row = rows.find((entry) => entry.type === type);
       const count = Number(row?.count ?? 0);
-      const averagePrice = Number(row?.avgPrice ?? 0);
+      const averagePrice =
+        role === UserRole.Admin ||
+        role === UserRole.Manager ||
+        role === UserRole.Landlord
+          ? Number(row?.avgPrice ?? 0)
+          : null;
       return {
         type,
         label: propertyTypeLabels[type],
@@ -213,6 +260,9 @@ export class StatsService {
       .createQueryBuilder('property')
       .select('property.city', 'city')
       .addSelect('COUNT(property.id)', 'count')
+      .where('property.status NOT IN (:...hiddenStatuses)', {
+        hiddenStatuses: [PropertyStatus.Deleted, PropertyStatus.Inactive],
+      })
       .groupBy('property.city')
       .orderBy('count', 'DESC')
       .limit(5)
@@ -272,6 +322,9 @@ export class StatsService {
         "SUM(CASE WHEN property.status = :rented THEN 1 ELSE 0 END)",
         'rented',
       )
+      .where('property.status NOT IN (:...hiddenStatuses)', {
+        hiddenStatuses: [PropertyStatus.Deleted, PropertyStatus.Inactive],
+      })
       .groupBy("DATE_FORMAT(property.createdAt, '%Y-%m-01')")
       .orderBy('month', 'DESC')
       .limit(6)

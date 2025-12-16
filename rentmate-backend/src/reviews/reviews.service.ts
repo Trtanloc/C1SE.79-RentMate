@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -8,9 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Review } from './entities/review.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { UpdateReviewDto } from './dto/update-review.dto';
 import { PropertiesService } from '../properties/properties.service';
 import { DataSource } from 'typeorm';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()
 export class ReviewsService implements OnModuleInit {
@@ -23,36 +25,108 @@ export class ReviewsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.dropLegacyUniqueConstraint();
+    await this.backfillReviewFlags();
   }
 
-  async create(tenantId: number, dto: CreateReviewDto) {
-    const property = await this.propertiesService.findOne(dto.propertyId);
-    // Always persist a new review so historical feedback is preserved
-    const review = this.reviewsRepository.create({
-      ...dto,
-      landlordId: dto.landlordId ?? property.ownerId,
-      tenantId,
-    });
-    return this.reviewsRepository.save(review);
+  async create(author: User, dto: CreateReviewDto) {
+    if (dto.propertyId) {
+      return this.createPropertyReview(author, dto);
+    }
+    return this.createPublicReview(author, dto);
   }
 
   findByProperty(propertyId: number) {
     return this.reviewsRepository.find({
-      where: { propertyId },
+      where: { propertyId, isPublic: false, isApproved: true },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async remove(id: number, tenantId: number) {
+  findPublicApproved(includePending = false) {
+    const where: Record<string, any> = { isPublic: true };
+    if (!includePending) {
+      where.isApproved = true;
+    }
+    return this.reviewsRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async approve(id: number, approved: boolean) {
     const review = await this.reviewsRepository.findOne({ where: { id } });
     if (!review) {
       throw new NotFoundException('Review not found');
     }
-    if (review.tenantId !== tenantId) {
+    review.isApproved = approved;
+    return this.reviewsRepository.save(review);
+  }
+
+  async remove(id: number, user: User) {
+    const review = await this.reviewsRepository.findOne({ where: { id } });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+    const isOwner = review.tenantId && user?.id === review.tenantId;
+    if (!isOwner && user?.role !== UserRole.Admin) {
       throw new ForbiddenException('You can only remove your review');
     }
     await this.reviewsRepository.remove(review);
     return { success: true };
+  }
+
+  private async createPropertyReview(author: User, dto: CreateReviewDto) {
+    if (!dto.propertyId) {
+      throw new BadRequestException('PropertyId is required for property reviews');
+    }
+    if (!author?.id) {
+      throw new ForbiddenException(
+        'Authentication is required to review this property',
+      );
+    }
+    const property = await this.propertiesService.findOne(dto.propertyId);
+    const comment = dto.comment ?? dto.content;
+    const review = this.reviewsRepository.create({
+      propertyId: dto.propertyId,
+      rating: dto.rating,
+      comment,
+      landlordId: dto.landlordId ?? property.ownerId,
+      tenantId: author?.id,
+      reviewerName: dto.reviewerName || author?.fullName,
+      reviewerRole: dto.reviewerRole || author?.role,
+      isPublic: false,
+      isApproved: true,
+    });
+    return this.reviewsRepository.save(review);
+  }
+
+  private async createPublicReview(author: User, dto: CreateReviewDto) {
+    const reviewerName = dto.reviewerName || author?.fullName;
+    const reviewerRole =
+      dto.reviewerRole ||
+      (author?.role === UserRole.Tenant || author?.role === UserRole.Landlord
+        ? author.role
+        : undefined);
+
+    if (!reviewerName || !reviewerRole) {
+      throw new BadRequestException(
+        'Reviewer name and role are required for testimonials',
+      );
+    }
+
+    const comment = dto.comment ?? dto.content;
+    const review = this.reviewsRepository.create({
+      rating: dto.rating,
+      comment,
+      reviewerName,
+      reviewerRole,
+      avatarUrl: dto.avatarUrl || author?.avatarUrl,
+      tenantId: author?.id,
+      isPublic: true,
+      isApproved: false,
+      propertyId: null,
+    });
+    return this.reviewsRepository.save(review);
   }
 
   private async dropLegacyUniqueConstraint() {
@@ -76,6 +150,20 @@ export class ReviewsService implements OnModuleInit {
       }
     } catch (error) {
       // Swallow errors to avoid blocking startup; index removal is best-effort
+    }
+  }
+
+  private async backfillReviewFlags() {
+    try {
+      await this.dataSource.query(`
+        UPDATE reviews
+        SET
+          isPublic = IFNULL(isPublic, FALSE),
+          isApproved = IFNULL(isApproved, TRUE)
+        WHERE isPublic IS NULL OR isApproved IS NULL
+      `);
+    } catch (error) {
+      // Best-effort; existing rows can be normalized later if needed
     }
   }
 }

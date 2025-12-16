@@ -11,14 +11,29 @@ export class Review {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  propertyId: number;
+  @Column({ nullable: true })
+  propertyId?: number;
 
-  @Column()
-  tenantId: number;
+  @Column({ nullable: true })
+  tenantId?: number;
 
   @Column({ nullable: true })
   landlordId?: number;
+
+  @Column({ length: 120, nullable: true })
+  reviewerName?: string;
+
+  @Column({ length: 50, nullable: true })
+  reviewerRole?: string;
+
+  @Column({ length: 500, nullable: true })
+  avatarUrl?: string;
+
+  @Column({ default: false })
+  isPublic: boolean;
+
+  @Column({ default: true })
+  isApproved: boolean;
 
   @Column({ type: 'int', default: 5 })
   rating: number;

@@ -24,7 +24,7 @@ const formatPrice = (value, t) => {
   return `${Number(value).toLocaleString('vi-VN')} VND`;
 };
 
-const CategoryHighlights = ({ categories = [], error = null }) => {
+const CategoryHighlights = ({ categories = [], error = null, onSelect, canViewFinancial = false }) => {
   const { t } = useI18n();
   const list = categories.length ? categories : Array.from({ length: 6 }, () => null);
 
@@ -50,10 +50,23 @@ const CategoryHighlights = ({ categories = [], error = null }) => {
         {list.map((category, index) => {
           const theme = palette[index % palette.length];
           const Icon = theme.icon;
+          const isClickable = Boolean(onSelect && category?.type);
           return (
             <article
               key={category?.type ?? index}
-              className={`${theme.surface} flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/90 p-5 shadow-floating-card transition hover:-translate-y-1`}
+              role={isClickable ? 'button' : 'group'}
+              tabIndex={isClickable ? 0 : -1}
+              onClick={() => isClickable && onSelect(category.type)}
+              onKeyDown={(event) => {
+                if (!isClickable) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(category.type);
+                }
+              }}
+              className={`${theme.surface} flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/90 p-5 shadow-floating-card transition hover:-translate-y-1 ${
+                isClickable ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40' : ''
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${theme.gradient} text-white`}>
@@ -75,7 +88,11 @@ const CategoryHighlights = ({ categories = [], error = null }) => {
               <div className="flex items-center justify-between text-sm font-semibold text-brand">
                 <span>{category ? formatCount(category.count, t) : '--'}</span>
                 <span className="rounded-full bg-white/80 px-3 py-1 text-xs text-gray-600">
-                  {category ? formatPrice(category.averagePrice, t) : '--'}
+                  {category
+                    ? canViewFinancial && category.averagePrice !== null && category.averagePrice !== undefined
+                      ? formatPrice(category.averagePrice, t)
+                      : t('category.protected', 'Visible to landlords/admin only')
+                    : '--'}
                 </span>
               </div>
             </article>

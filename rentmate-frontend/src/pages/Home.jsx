@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, TrendingUp, Zap } from 'lucide-react';
+import { TrendingUp, Zap } from 'lucide-react';
 import axiosClient from '../api/axiosClient.js';
 import { fetchOverviewStats, fetchCategoryHighlights } from '../api/statsApi.js';
-import { fetchTestimonials } from '../api/testimonialsApi.js';
+import { fetchPublicReviews } from '../api/reviewsApi.js';
 import HeroSection from '../components/home/HeroSection.jsx';
 import SearchFilters from '../components/home/SearchFilters.jsx';
 import CategoryHighlights from '../components/home/CategoryHighlights.jsx';
@@ -11,14 +11,13 @@ import PropertyShowcase from '../components/home/PropertyShowcase.jsx';
 import Testimonials from '../components/home/Testimonials.jsx';
 import NotificationSpotlight from '../components/home/NotificationSpotlight.jsx';
 import AssistantPromo from '../components/home/AssistantPromo.jsx';
+import FeedbackForm from '../components/home/FeedbackForm.jsx';
 import { useMetadata } from '../context/MetadataContext.jsx';
 import { useI18n } from '../i18n/useI18n.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { UserRole } from '../utils/constants.js';
 
-const defaultMetrics = [
-  { label: 'Active listings', value: '--' },
-  { label: 'Verified landlords', value: '--' },
-  { label: 'Contracts created', value: '--' },
-];
+const defaultMetrics = [{ label: 'Active listings', value: '--' }];
 
 const HotDealBanner = ({ onView }) => {
   const { t } = useI18n();
@@ -76,6 +75,9 @@ const formatMetricValue = (value) => {
 const Home = () => {
   const { propertyTypes, cities, loading: metadataLoading } = useMetadata();
   const { t } = useI18n();
+  const { user } = useAuth();
+  const role = user?.role ?? UserRole.Tenant;
+  const canViewFinancial = role === UserRole.Admin || role === UserRole.Landlord;
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -136,7 +138,7 @@ const Home = () => {
 
     const loadTestimonials = async () => {
       try {
-        const data = await fetchTestimonials();
+        const data = await fetchPublicReviews();
         setTestimonials(data);
         setTestimonialError(null);
       } catch (err) {
@@ -158,7 +160,8 @@ const Home = () => {
 
   const handleSearchRedirect = (filters) => {
     const params = new URLSearchParams();
-    if (filters.keyword) params.set('search', filters.keyword);
+    const keyword = filters.keyword?.trim().replace(/\s+/g, ' ');
+    if (keyword) params.set('search', keyword);
     if (filters.city) params.set('city', filters.city);
     if (filters.budget) params.set('maxPrice', filters.budget);
     if (filters.propertyType) params.set('type', filters.propertyType);
@@ -167,25 +170,58 @@ const Home = () => {
     navigate(query ? `/properties?${query}` : '/properties');
   };
 
+  const handleCategorySelect = (type) => {
+    if (!type) return;
+    navigate(`/properties?type=${encodeURIComponent(type)}`);
+  };
+
   const heroMetrics = useMemo(() => {
+    const activeMetric = {
+      label: t('home.metrics.active', 'Active listings'),
+      value: formatMetricValue(stats?.activeListings),
+    };
+
     if (!stats) {
+      if (role === UserRole.Admin || role === UserRole.Landlord) {
+        return [
+          activeMetric,
+          { label: t('home.metrics.contracts', 'Contracts created'), value: '--' },
+          { label: t('home.metrics.landlords', 'Verified landlords'), value: '--' },
+        ];
+      }
       return defaultMetrics;
     }
-    return [
-      {
-        label: t('home.metrics.active', 'Active listings'),
-        value: formatMetricValue(stats.activeListings),
-      },
-      {
-        label: t('home.metrics.landlords', 'Verified landlords'),
-        value: formatMetricValue(stats.landlordCount),
-      },
-      {
-        label: t('home.metrics.contracts', 'Contracts created'),
-        value: formatMetricValue(stats.contractsSigned),
-      },
-    ];
-  }, [stats, t]);
+
+    if (role === UserRole.Landlord) {
+      return [
+        activeMetric,
+        {
+          label: t('home.metrics.contracts', 'Contracts created'),
+          value: formatMetricValue(stats.contractsSigned),
+        },
+        {
+          label: t('home.metrics.newListings', 'New this month'),
+          value: formatMetricValue(stats.newListingsThisMonth),
+        },
+      ];
+    }
+
+    if (role === UserRole.Admin) {
+      return [
+        activeMetric,
+        {
+          label: t('home.metrics.landlords', 'Verified landlords'),
+          value: formatMetricValue(stats.landlordCount),
+        },
+        {
+          label: t('home.metrics.contracts', 'Contracts created'),
+          value: formatMetricValue(stats.contractsSigned),
+        },
+      ];
+    }
+
+    return [activeMetric];
+  }, [stats, role, t]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-10 px-4 pb-12 pt-6">
@@ -196,26 +232,6 @@ const Home = () => {
         </div>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {heroMetrics.map((metric, index) => {
-          const Icon = [Zap, Sparkles, TrendingUp][index % 3];
-          return (
-            <div
-              key={metric.label}
-              className="soft-card flex items-center gap-3 rounded-2xl bg-white p-4 text-brand shadow-lg"
-            >
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-gray-500">{metric.label}</p>
-                <p className="text-xl font-semibold text-brand">{metric.value}</p>
-              </div>
-            </div>
-          );
-        })}
-      </section>
-
       <SearchFilters onSearch={handleSearchRedirect} propertyTypes={propertyTypes} cities={cities} />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -225,9 +241,15 @@ const Home = () => {
 
       <HotDealBanner onView={() => navigate('/properties')} />
 
-      <CategoryHighlights categories={categories} error={categoryError} />
+      <CategoryHighlights
+        categories={categories}
+        error={categoryError}
+        onSelect={handleCategorySelect}
+        canViewFinancial={canViewFinancial}
+      />
       <PropertyShowcase properties={properties} loading={loading} error={error} />
       <Testimonials items={testimonials} error={testimonialError} />
+      <FeedbackForm />
       {metadataLoading && (
         <p className="mt-4 text-xs text-gray-400">{t('home.meta.loading', 'Syncing filter metadata...')}</p>
       )}

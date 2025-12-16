@@ -21,6 +21,9 @@ const normalizeCity = (value?: string) => {
 export class ListPropertiesDto {
   @IsOptional()
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   search?: string;
 
   @IsOptional()

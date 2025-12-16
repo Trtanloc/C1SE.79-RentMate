@@ -102,7 +102,10 @@ const HeroSection = ({ featuredProperty, metrics = defaultMetrics }) => {
 
         <div className="flex w-full justify-end lg:mr-6 lg:self-center">
           {featuredProperty ? (
-            <div className="w-full max-w-md space-y-5 rounded-2xl border border-white/20 bg-white/95 p-6 text-brand shadow-xl shadow-slate-900/15 sm:p-8">
+            <Link
+              to={featuredProperty?.id ? `/properties/${featuredProperty.id}` : '/properties'}
+              className="w-full max-w-md space-y-5 rounded-2xl border border-white/20 bg-white/95 p-6 text-brand shadow-xl shadow-slate-900/15 sm:p-8 transition hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            >
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">
                 <Zap className="h-4 w-4 text-primary" />
                 {t('hero.featured.title', 'Featured now')}
@@ -142,7 +145,7 @@ const HeroSection = ({ featuredProperty, metrics = defaultMetrics }) => {
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
           ) : (
             <div className="flex w-full max-w-md min-h-[20rem] items-center justify-center rounded-2xl border border-white/25 bg-white/10 p-6 text-center text-white/80 shadow-xl shadow-slate-900/15 sm:p-8">
               {t('hero.featured.loading', 'Loading featured property...')}

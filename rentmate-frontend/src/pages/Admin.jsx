@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axiosClient from '../api/axiosClient.js';
+import { approveReview } from '../api/reviewsApi.js';
 import {
   LandlordApplicationStatus,
   UserRole,
@@ -226,6 +227,8 @@ const AdminPage = () => {
   );
   const [actionTarget, setActionTarget] = useState(null);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewActionId, setReviewActionId] = useState(null);
 
   const statusFilters = useMemo(() => {
     const metaOptions =
@@ -251,6 +254,7 @@ const AdminPage = () => {
         usersRes,
         dashboardRes,
         highlightsRes,
+        reviewsRes,
       ] = await Promise.all([
         axiosClient.get('/stats/overview'),
         axiosClient.get('/landlord-applications', {
@@ -261,6 +265,7 @@ const AdminPage = () => {
         axiosClient.get('/users/highlights', {
           params: { limit: 6 },
         }),
+        axiosClient.get('/reviews', { params: { includePending: true } }),
       ]);
       setOverview(overviewRes.data.data);
       setApplications(appsRes.data.data || []);
@@ -272,6 +277,7 @@ const AdminPage = () => {
           featuredTenants: [],
         },
       );
+      setReviews(reviewsRes?.data?.data || []);
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -307,6 +313,22 @@ const AdminPage = () => {
       setError(Array.isArray(message) ? message.join(', ') : message);
     } finally {
       setActionTarget(null);
+    }
+  };
+
+  const handleReviewApproval = async (id, approved) => {
+    setReviewActionId(id);
+    try {
+      const data = await approveReview(id, approved);
+      setReviews((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...data } : item)),
+      );
+    } catch (err) {
+      const message =
+        err.response?.data?.message || 'Unable to update review status.';
+      setError(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setReviewActionId(null);
     }
   };
 
@@ -394,6 +416,77 @@ const AdminPage = () => {
             <AdminDepositConfirmation />
           </div>
           {/* ============================================================= */}
+
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">Customer reviews</h2>
+                <p className="text-sm text-gray-500">
+                  Testimonials submitted by tenants/landlords. Approve to publish to the homepage or hide them.
+                </p>
+              </div>
+            </div>
+            {reviews.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-500">No reviews submitted yet.</p>
+            ) : (
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {reviews.map((review) => (
+                  <article
+                    key={review.id}
+                    className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 text-sm text-gray-700"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">
+                          {review.reviewerName || 'N/A'}
+                        </p>
+                        <p className="text-xs uppercase tracking-wide text-gray-500">
+                          {review.reviewerRole || 'customer'}
+                        </p>
+                        {typeof review.rating === 'number' && (
+                          <p className="text-xs font-semibold text-amber-600">
+                            {review.rating}/5
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          review.isApproved
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {review.isApproved ? 'Approved' : 'Pending'}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-gray-600">
+                      {review.comment || review.content || 'No content provided.'}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {!review.isApproved && (
+                        <button
+                          type="button"
+                          onClick={() => handleReviewApproval(review.id, true)}
+                          disabled={reviewActionId === review.id}
+                          className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {reviewActionId === review.id ? 'Saving...' : 'Approve'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleReviewApproval(review.id, false)}
+                        disabled={reviewActionId === review.id}
+                        className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {review.isApproved ? 'Hide' : 'Reject'}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
 
           {/* Landlord Applications */}
           <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">

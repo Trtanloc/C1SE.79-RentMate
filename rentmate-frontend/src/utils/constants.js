@@ -11,6 +11,8 @@ export const PropertyStatus = {
   Available: 'available',
   Rented: 'rented',
   Pending: 'pending',
+  Inactive: 'inactive',
+  Deleted: 'deleted',
 };
 
 
@@ -26,6 +28,14 @@ export const fallbackPropertyStatusMeta = {
   [PropertyStatus.Pending]: {
     label: 'Pending Review',
     badgeClass: 'border-sky-200 bg-sky-50 text-sky-700',
+  },
+  [PropertyStatus.Inactive]: {
+    label: 'Inactive',
+    badgeClass: 'border-gray-200 bg-gray-100 text-gray-600',
+  },
+  [PropertyStatus.Deleted]: {
+    label: 'Deleted',
+    badgeClass: 'border-gray-200 bg-gray-50 text-gray-500 line-through',
   },
 };
 

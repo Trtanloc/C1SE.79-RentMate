@@ -78,6 +78,9 @@ export class MetadataService {
       .select(`DISTINCT property.${column}`, 'value')
       .where(`property.${column} IS NOT NULL`)
       .andWhere(`property.${column} != ''`)
+      .andWhere('property.status NOT IN (:...hiddenStatuses)', {
+        hiddenStatuses: [PropertyStatus.Deleted, PropertyStatus.Inactive],
+      })
       .orderBy(`property.${column}`, 'ASC')
       .getRawMany<{ value: string }>();
 
@@ -109,6 +112,8 @@ export class MetadataService {
       [PropertyStatus.Available]: 'Available',
       [PropertyStatus.Rented]: 'Rented',
       [PropertyStatus.Pending]: 'Pending Approval',
+      [PropertyStatus.Inactive]: 'Inactive',
+      [PropertyStatus.Deleted]: 'Deleted',
     };
 
     return Object.values(PropertyStatus).map((value) => ({

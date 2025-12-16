@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Express } from 'express';
 import { Property } from './entities/property.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -9,6 +9,8 @@ import { PropertyPhoto } from './entities/property-photo.entity';
 import { PropertyAmenity } from './entities/property-amenity.entity';
 import { ListPropertiesDto } from './dto/list-properties.dto';
 import { Review } from '../reviews/entities/review.entity';
+import { PropertyStatus } from '../common/enums/property-status.enum';
+import { normalizeVietnamese } from '../common/constants/vietnam-cities';
 
 @Injectable()
 export class PropertiesService {
@@ -42,6 +44,7 @@ export class PropertiesService {
       photos: this.buildPhotoEntities(combinedPhotoUrls),
       amenities: this.buildAmenityEntities(createPropertyDto.amenities),
     });
+    property.searchTextNormalized = this.buildSearchTextNormalized(property);
     return this.propertiesRepository.save(property);
   }
 
@@ -51,13 +54,21 @@ export class PropertiesService {
       .leftJoinAndSelect('property.owner', 'owner')
       .leftJoinAndSelect('property.photos', 'photos')
       .leftJoinAndSelect('property.amenities', 'amenities')
+      .where('property.status NOT IN (:...hiddenStatuses)', {
+        hiddenStatuses: [PropertyStatus.Deleted, PropertyStatus.Inactive],
+      })
       .orderBy('property.createdAt', 'DESC')
       .addOrderBy('photos.sortOrder', 'ASC');
 
-    if (filters.search) {
+    const trimmedSearch = filters.search?.trim();
+    if (trimmedSearch) {
+      const normalizedSearch = this.normalizeSearchValue(trimmedSearch);
       query.andWhere(
-        '(property.title LIKE :search OR property.address LIKE :search OR property.city LIKE :search)',
-        { search: `%${filters.search}%` },
+        '(LOWER(property.title) LIKE :search OR LOWER(property.address) LIKE :search OR LOWER(property.city) LIKE :search OR property.searchTextNormalized LIKE :normalized)',
+        {
+          search: `%${trimmedSearch.toLowerCase()}%`,
+          normalized: `%${normalizedSearch}%`,
+        },
       );
     }
 
@@ -101,7 +112,7 @@ export class PropertiesService {
       where: { id },
       relations: ['owner', 'photos', 'amenities'],
     });
-    if (!property) {
+    if (!property || property.status === PropertyStatus.Deleted) {
       throw new NotFoundException(`Property with id ${id} not found`);
     }
     const sorted = this.sortPropertyRelations(property);
@@ -111,7 +122,7 @@ export class PropertiesService {
 
   async findOwnedByUser(ownerId: number) {
     const list = await this.propertiesRepository.find({
-      where: { ownerId },
+      where: { ownerId, status: Not(PropertyStatus.Deleted) },
       relations: ['photos', 'amenities'],
       order: { createdAt: 'DESC' },
     });
@@ -127,7 +138,7 @@ export class PropertiesService {
       where: { id },
     });
 
-    if (!property) {
+    if (!property || property.status === PropertyStatus.Deleted) {
       throw new NotFoundException(`Property with id ${id} not found`);
     }
 
@@ -154,6 +165,7 @@ export class PropertiesService {
       property.slug = await this.generateUniqueSlug(rest.title, id);
     }
 
+    property.searchTextNormalized = this.buildSearchTextNormalized(property);
     return this.propertiesRepository.save(property);
   }
 
@@ -164,7 +176,10 @@ export class PropertiesService {
     if (!property) {
       throw new NotFoundException(`Property with id ${id} not found`);
     }
-    await this.propertiesRepository.remove(property);
+    property.status = PropertyStatus.Deleted;
+    property.deletedAt = new Date();
+    property.isFeatured = false;
+    await this.propertiesRepository.save(property);
   }
 
   private buildPhotoEntities(urls?: string[]) {
@@ -188,6 +203,26 @@ export class PropertiesService {
     return photoFiles
       .filter((file) => Boolean(file?.filename))
       .map((file) => `/uploads/properties/${file.filename}`);
+  }
+
+  private buildSearchTextNormalized(payload: Partial<Property>) {
+    const combined = [
+      payload.title,
+      payload.address,
+      payload.city,
+      payload.district,
+      payload.ward,
+    ]
+      .filter((value) => Boolean(value))
+      .join(' ');
+    return this.normalizeSearchValue(combined);
+  }
+
+  private normalizeSearchValue(value?: string) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+    return normalizeVietnamese(value).trim();
   }
 
   private buildAmenityEntities(labels?: string[]) {
@@ -243,6 +278,9 @@ export class PropertiesService {
       .addSelect('AVG(review.rating)', 'avg')
       .addSelect('COUNT(review.id)', 'count')
       .where('review.propertyId IN (:...ids)', { ids })
+      .andWhere('review.propertyId IS NOT NULL')
+      .andWhere('(review.isPublic = false OR review.isPublic IS NULL)')
+      .andWhere('(review.isApproved = true OR review.isApproved IS NULL)')
       .groupBy('review.propertyId')
       .getRawMany<{ propertyId: number; avg: string; count: string }>();
     const map = new Map<number, { avg: number; count: number }>();

@@ -1,3 +1,4 @@
+import { Star } from 'lucide-react';
 import { useI18n } from '../../i18n/useI18n.js';
 import { resolveAssetUrl } from '../../utils/assets.js';
 
@@ -21,39 +22,56 @@ const Testimonials = ({ items = [], error = null }) => {
         </div>
       )}
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        {list.map((testimonial, index) => (
-          <article
-            key={testimonial?.id ?? index}
-            className="rounded-3xl border border-gray-100 bg-white px-5 py-6 shadow-sm"
-          >
-            <p className="text-sm text-gray-600">
-              &ldquo;
-              {testimonial?.message ??
-                t(
-                  'testimonials.subtitle',
-                  'Fresh feedback will appear here as soon as the backend returns it.',
-                )}
-              &rdquo;
-            </p>
-            <div className="mt-5 flex items-center gap-3">
-              {testimonial?.avatarUrl && (
-                <img
-                  src={resolveAssetUrl(testimonial.avatarUrl)}
-                  alt={testimonial.authorName}
-                  className="h-12 w-12 rounded-full object-cover"
-                />
+        {list.map((testimonial, index) => {
+          const name =
+            testimonial?.authorName ||
+            testimonial?.reviewerName ||
+            t('category.loading', 'Updating');
+          const role = testimonial?.authorRole || testimonial?.reviewerRole || '';
+          const content =
+            testimonial?.message ||
+            testimonial?.comment ||
+            testimonial?.content ||
+            t(
+              'testimonials.subtitle',
+              'Fresh feedback will appear here as soon as the backend returns it.',
+            );
+
+          return (
+            <article
+              key={testimonial?.id ?? index}
+              className="rounded-3xl border border-gray-100 bg-white px-5 py-6 shadow-sm"
+            >
+              <p className="text-sm text-gray-600">
+                &ldquo;{content}&rdquo;
+              </p>
+              {typeof testimonial?.rating === 'number' && (
+                <div className="mt-3 flex items-center gap-1 text-sm font-semibold text-amber-600">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  {testimonial.rating}/5
+                </div>
               )}
-              <div>
-                <p className="text-base font-semibold text-brand">
-                  {testimonial?.authorName ?? t('category.loading', 'Updating')}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {testimonial?.authorRole ?? ''}
-                </p>
+              <div className="mt-5 flex items-center gap-3">
+                {testimonial?.avatarUrl && (
+                  <img
+                    src={resolveAssetUrl(testimonial.avatarUrl)}
+                    alt={name}
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                )}
+                <div>
+                  <p className="text-base font-semibold text-brand">{name}</p>
+                  <p className="text-sm text-gray-500">{role}</p>
+                  {testimonial?.createdAt && (
+                    <p className="text-xs text-gray-400">
+                      {new Date(testimonial.createdAt).toLocaleDateString('vi-VN')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

@@ -102,6 +102,10 @@ export class Property {
   })
   status: PropertyStatus;
 
+  @Index('IDX_PROPERTY_SEARCH_NORMALIZED')
+  @Column({ length: 300, default: '' })
+  searchTextNormalized: string;
+
   @OneToMany(() => PropertyPhoto, (photo) => photo.property, {
     cascade: true,
     eager: true,
@@ -125,4 +129,7 @@ export class Property {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  deletedAt?: Date;
 }

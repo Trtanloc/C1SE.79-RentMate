@@ -70,12 +70,16 @@ const Dashboard = () => {
 
   const statusOptions = useMemo(() => {
     if (propertyStatuses.length > 0) {
-      return propertyStatuses;
+      return propertyStatuses.filter(
+        (option) => option.value !== PropertyStatus.Deleted,
+      );
     }
-    return Object.entries(propertyStatusMeta).map(([value, meta]) => ({
-      value,
-      label: meta.label || value,
-    }));
+    return Object.entries(propertyStatusMeta)
+      .filter(([value]) => value !== PropertyStatus.Deleted)
+      .map(([value, meta]) => ({
+        value,
+        label: meta.label || value,
+      }));
   }, [propertyStatuses, propertyStatusMeta]);
 
   const normalizeToken = (value = '') =>
@@ -354,6 +358,40 @@ const Dashboard = () => {
     setError(null);
   };
 
+  const handleDeleteProperty = async (propertyId) => {
+    if (!propertyId) {
+      return;
+    }
+    const confirmed = window.confirm(
+      t('dashboard.delete.confirm', 'Are you sure you want to delete this property?'),
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      setError(null);
+      await axiosClient.delete(`/properties/${propertyId}`);
+      setProperties((prev) => prev.filter((item) => item.id !== propertyId));
+      if (editingId === propertyId) {
+        setEditingId(null);
+        setFormErrors({});
+        setPhotoFiles([]);
+        setForm(
+          createEmptyForm({
+            type: defaultPropertyType,
+            status: defaultPropertyStatus,
+            city: cities[0],
+            country: countries[0] || 'Vietnam',
+          }),
+        );
+      }
+      setSuccess(t('dashboard.delete.success', 'Property deleted successfully'));
+    } catch (err) {
+      const message = err.response?.data?.message || 'Unable to delete property';
+      setError(Array.isArray(message) ? message.join(', ') : message);
+    }
+  };
+
   const fieldClass = (field) =>
     `w-full rounded-xl border px-4 py-2 text-sm outline-none transition focus:ring-2 ${
       formErrors[field]
@@ -599,6 +637,13 @@ const Dashboard = () => {
                       className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-gray-700 shadow hover:bg-white"
                     >
                       Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProperty(property.id)}
+                      className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 shadow hover:bg-rose-100"
+                    >
+                      {t('dashboard.delete.action', 'Delete')}
                     </button>
                   </div>
                 </div>

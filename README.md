@@ -65,7 +65,10 @@ API served at `http://localhost:3000/api`.
 - `GET /api/properties/:id`
 - `POST /api/properties` (landlord/admin)
 - `PUT /api/properties/:id` (owner/admin)
-- `DELETE /api/properties/:id` (owner/admin)
+- `DELETE /api/properties/:id` (owner/admin, soft delete -> hidden from listings)
+- `GET /api/reviews` (public testimonials; admin can include pending via `includePending=true`)
+- `POST /api/reviews` (property review or customer testimonial, requires login)
+- `PATCH /api/reviews/:id/approve` (admin approve/hide)
 - `GET /api/messages/:conversationId`
 - `POST /api/messages`
 - `POST /api/ai/chat`
@@ -115,4 +118,5 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 - Ensure `GEMINI_API_KEY` is configured on the backend server (never expose it to the frontend).
 - Transactions list/detail are admin/manager-only; checkout requires the tenant/landlord of the contract.
 - Use `npm run db:patch:hashed-tokens` (backend) to add hashed token columns if your DB predates this change.
-
+- Property deletion is implemented as a soft delete (status set to `deleted`); deleted/inactive listings are omitted from public searches and stats.
+- Stats and category aggregates are role-aware: tenants only see active listing counts; landlords see metrics for their own listings; admins retain full financial visibility.
