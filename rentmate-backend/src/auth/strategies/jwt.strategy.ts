@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UsersService } from '../../users/users.service';
+import { UserStatus } from '../../common/enums/user-status.enum';
 
 interface JwtPayload {
   sub: number;
@@ -27,6 +28,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+    if (user.status === UserStatus.Disabled || user.isActive === false) {
+      throw new UnauthorizedException('Account is disabled');
     }
     return user;
   }

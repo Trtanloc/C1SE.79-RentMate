@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { StatsService } from './stats.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt.guard';
@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { TrackVisitDto } from './dto/track-visit.dto';
 
 @Controller('stats')
 export class StatsController {
@@ -47,5 +48,18 @@ export class StatsController {
   async getAdminCharts() {
     const data = await this.statsService.getAdminCharts();
     return { success: true, data };
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Post('track-visit')
+  async trackVisit(@Body() dto: TrackVisitDto, @Req() req: Request) {
+    await this.statsService.recordVisit(dto.path, req.user as any, {
+      referrer: dto.referrer,
+      userAgent: req.headers['user-agent'] as string,
+    });
+    return {
+      success: true,
+      data: { recorded: true },
+    };
   }
 }

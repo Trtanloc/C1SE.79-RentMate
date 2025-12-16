@@ -13,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import { User } from '../users/entities/user.entity';
 import { VerificationCodesService } from '../verification-codes/verification-codes.service';
 import { UserRole } from '../common/enums/user-role.enum';
+import { UserStatus } from '../common/enums/user-status.enum';
 import { ConfigService } from '@nestjs/config';
 import { MailerService } from '../mail/mailer.service';
 
@@ -88,6 +89,12 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.status === UserStatus.Disabled || user.isActive === false) {
+      throw new UnauthorizedException(
+        'Your account has been disabled. Please contact support.',
+      );
     }
 
     return user;

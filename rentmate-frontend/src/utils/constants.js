@@ -7,6 +7,22 @@ export const UserRole = {
   Admin: 'admin',
 };
 
+export const UserStatus = {
+  Active: 'active',
+  Disabled: 'disabled',
+};
+
+export const userStatusMeta = {
+  [UserStatus.Active]: {
+    label: 'Active',
+    badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  [UserStatus.Disabled]: {
+    label: 'Disabled',
+    badgeClass: 'border-rose-200 bg-rose-50 text-rose-700',
+  },
+};
+
 export const PropertyStatus = {
   Available: 'available',
   Rented: 'rented',

@@ -29,6 +29,9 @@ axiosClient.interceptors.response.use(
       localStorage.removeItem('rentmate_user');
       sessionStorage.removeItem('rentmate_token');
       sessionStorage.removeItem('rentmate_user');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('rentmate:unauthorized'));
+      }
 
     }
     return Promise.reject(error);

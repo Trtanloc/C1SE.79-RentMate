@@ -14,6 +14,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserRole } from '../common/enums/user-role.enum';
 import { PropertyStatus } from '../common/enums/property-status.enum';
 import { ContractStatus } from '../common/enums/contract-status.enum';
+import { UserStatus } from '../common/enums/user-status.enum';
 
 @Injectable()
 export class UsersService {
@@ -22,13 +23,17 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
-  findAll(query: ListUsersDto = {} as ListUsersDto): Promise<User[]> {
+  private buildListQuery(query: ListUsersDto = {} as ListUsersDto) {
     const qb = this.usersRepository
       .createQueryBuilder('user')
       .orderBy('user.updatedAt', 'DESC');
 
     if (query.role) {
       qb.andWhere('user.role = :role', { role: query.role });
+    }
+
+    if (query.status) {
+      qb.andWhere('user.status = :status', { status: query.status });
     }
 
     if (typeof query.isActive === 'boolean') {
@@ -44,6 +49,12 @@ export class UsersService {
       );
     }
 
+    return qb;
+  }
+
+  findAll(query: ListUsersDto = {} as ListUsersDto): Promise<User[]> {
+    const qb = this.buildListQuery(query);
+
     if (query.limit) {
       qb.take(query.limit);
       if (query.page) {
@@ -52,6 +63,22 @@ export class UsersService {
     }
 
     return qb.getMany();
+  }
+
+  async findAllWithPagination(query: ListUsersDto = {} as ListUsersDto) {
+    const qb = this.buildListQuery(query);
+    const limit = query.limit ?? 20;
+    const page = query.page ?? 1;
+    qb.take(limit);
+    qb.skip((page - 1) * limit);
+
+    const [items, total] = await qb.getManyAndCount();
+    return {
+      items,
+      total,
+      page,
+      limit,
+    };
   }
 
   findById(id: number): Promise<User | null> {
@@ -84,9 +111,20 @@ export class UsersService {
       throw new BadRequestException('Email already exists');
     }
 
+    const status =
+      createUserDto.status ??
+      (createUserDto.isActive === false
+        ? UserStatus.Disabled
+        : UserStatus.Active);
+
     const user = this.usersRepository.create({
       ...createUserDto,
       email: normalizedEmail,
+      status,
+      isActive:
+        typeof createUserDto.isActive === 'boolean'
+          ? createUserDto.isActive
+          : status === UserStatus.Active,
     });
     return this.usersRepository.save(user);
   }
@@ -94,15 +132,32 @@ export class UsersService {
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     if (updateUserDto.email) {
       const existing = await this.findByEmail(updateUserDto.email);
-      if (existing && existing.id !== id) {
-        throw new BadRequestException('Email already exists');
-      }
+    if (existing && existing.id !== id) {
+      throw new BadRequestException('Email already exists');
+    }
+    }
+
+    const payload: UpdateUserDto & Partial<User> = {
+      ...updateUserDto,
+      email: updateUserDto.email?.toLowerCase() ?? undefined,
+    };
+
+    if (typeof updateUserDto.status !== 'undefined') {
+      payload.status = updateUserDto.status;
+      payload.isActive =
+        typeof updateUserDto.isActive === 'boolean'
+          ? updateUserDto.isActive
+          : updateUserDto.status !== UserStatus.Disabled;
+    } else if (typeof updateUserDto.isActive === 'boolean') {
+      payload.isActive = updateUserDto.isActive;
+      payload.status = updateUserDto.isActive
+        ? UserStatus.Active
+        : UserStatus.Disabled;
     }
 
     const user = await this.usersRepository.preload({
       id,
-      ...updateUserDto,
-      email: updateUserDto.email?.toLowerCase() ?? undefined,
+      ...payload,
     });
 
     if (!user) {
@@ -113,8 +168,7 @@ export class UsersService {
   }
 
   async remove(id: number): Promise<void> {
-    const user = await this.findOneOrFail(id);
-    await this.usersRepository.remove(user);
+    await this.disableUser(id);
   }
 
   async changePassword(id: number, dto: ChangePasswordDto): Promise<void> {
@@ -148,7 +202,7 @@ export class UsersService {
     const activeLandlords = await this.usersRepository
       .createQueryBuilder('user')
       .where('user.role = :role', { role: UserRole.Landlord })
-      .andWhere('user.isActive = :active', { active: true })
+      .andWhere('user.status = :status', { status: UserStatus.Active })
       .loadRelationCountAndMap('user.propertyCount', 'user.properties')
       .loadRelationCountAndMap(
         'user.activeListingCount',
@@ -166,7 +220,7 @@ export class UsersService {
     const featuredTenants = await this.usersRepository
       .createQueryBuilder('user')
       .where('user.role = :role', { role: UserRole.Tenant })
-      .andWhere('user.isActive = :active', { active: true })
+      .andWhere('user.status = :status', { status: UserStatus.Active })
       .loadRelationCountAndMap(
         'user.completedContracts',
         'user.contractsAsTenant',
@@ -185,5 +239,19 @@ export class UsersService {
       .getMany();
 
     return { activeLandlords, featuredTenants };
+  }
+
+  async disableUser(id: number): Promise<User> {
+    const user = await this.findOneOrFail(id);
+    user.status = UserStatus.Disabled;
+    user.isActive = false;
+    return this.usersRepository.save(user);
+  }
+
+  async enableUser(id: number): Promise<User> {
+    const user = await this.findOneOrFail(id);
+    user.status = UserStatus.Active;
+    user.isActive = true;
+    return this.usersRepository.save(user);
   }
 }

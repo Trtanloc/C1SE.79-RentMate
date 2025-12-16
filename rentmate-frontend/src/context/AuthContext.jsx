@@ -7,6 +7,7 @@ import {
   useCallback,
 } from 'react';
 import axiosClient from '../api/axiosClient.js';
+import { UserStatus } from '../utils/constants.js';
 
 const AuthContext = createContext(null);
 
@@ -24,7 +25,15 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.getItem('rentmate_token');
 
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      if (parsedUser.status === UserStatus.Disabled) {
+        localStorage.removeItem('rentmate_user');
+        localStorage.removeItem('rentmate_token');
+        sessionStorage.removeItem('rentmate_user');
+        sessionStorage.removeItem('rentmate_token');
+        return;
+      }
+      setUser(parsedUser);
       setToken(storedToken);
     }
   }, []);
@@ -87,12 +96,26 @@ export const AuthProvider = ({ children }) => {
     }
   }, [clearStorage]);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearStorage();
+      setUser(null);
+      setToken(null);
+    };
+    window.addEventListener('rentmate:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('rentmate:unauthorized', handleUnauthorized);
+    };
+  }, [clearStorage]);
+
 
   const value = useMemo(
     () => ({
       user,
       token,
-      isAuthenticated: Boolean(user && token),
+      isAuthenticated:
+        Boolean(user && token) &&
+        user?.status !== UserStatus.Disabled,
       login,
       logout,
       refreshUser,

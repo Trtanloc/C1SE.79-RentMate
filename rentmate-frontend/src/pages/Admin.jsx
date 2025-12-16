@@ -4,7 +4,9 @@ import { approveReview } from '../api/reviewsApi.js';
 import {
   LandlordApplicationStatus,
   UserRole,
+  UserStatus,
   landlordApplicationStatusMeta as landlordStatusFallback,
+  userStatusMeta,
 } from '../utils/constants.js';
 import { useMetadata } from '../context/MetadataContext.jsx';
 import { useI18n } from '../i18n/useI18n.js';
@@ -216,11 +218,15 @@ const AdminPage = () => {
   const [overview, setOverview] = useState(null);
   const [applications, setApplications] = useState([]);
   const [users, setUsers] = useState([]);
+  const [userMeta, setUserMeta] = useState({ total: 0, page: 1, limit: 10 });
+  const [userPage, setUserPage] = useState(1);
+  const [userStatusFilter, setUserStatusFilter] = useState('all');
   const [userHighlights, setUserHighlights] = useState({
     activeLandlords: [],
     featuredTenants: [],
   });
   const [loading, setLoading] = useState(true);
+  const [userTableLoading, setUserTableLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState(
     LandlordApplicationStatus.Pending,
@@ -229,6 +235,9 @@ const AdminPage = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewActionId, setReviewActionId] = useState(null);
+  const [trafficStats, setTrafficStats] = useState(null);
+  const [trafficLoading, setTrafficLoading] = useState(true);
+  const [userActionId, setUserActionId] = useState(null);
 
   const statusFilters = useMemo(() => {
     const metaOptions =
@@ -251,7 +260,6 @@ const AdminPage = () => {
       const [
         overviewRes,
         appsRes,
-        usersRes,
         dashboardRes,
         highlightsRes,
         reviewsRes,
@@ -260,7 +268,6 @@ const AdminPage = () => {
         axiosClient.get('/landlord-applications', {
           params: statusFilter === 'all' ? {} : { status: statusFilter },
         }),
-        axiosClient.get('/users'),
         axiosClient.get('/stats/dashboard'),
         axiosClient.get('/users/highlights', {
           params: { limit: 6 },
@@ -269,7 +276,6 @@ const AdminPage = () => {
       ]);
       setOverview(overviewRes.data.data);
       setApplications(appsRes.data.data || []);
-      setUsers(usersRes.data.data || []);
       setDashboardStats(dashboardRes.data.data);
       setUserHighlights(
         highlightsRes?.data?.data || {
@@ -291,6 +297,61 @@ const AdminPage = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const loadUsersList = useCallback(async () => {
+    setUserTableLoading(true);
+    setError(null);
+    try {
+      const limit = userMeta.limit || 10;
+      const params = { page: userPage, limit };
+      if (userStatusFilter !== 'all') {
+        params.status = userStatusFilter;
+      }
+      const { data } = await axiosClient.get('/admin/users', {
+        params,
+      });
+      const payload = data?.data || {};
+      setUsers(payload.items || []);
+      setUserMeta({
+        total: payload.total ?? payload.items?.length ?? 0,
+        page: payload.page ?? userPage,
+        limit: payload.limit ?? limit,
+      });
+    } catch (err) {
+      const message =
+        err.response?.data?.message || 'Unable to load user list.';
+      setError(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setUserTableLoading(false);
+    }
+  }, [userMeta.limit, userPage, userStatusFilter]);
+
+  const loadTrafficStats = useCallback(async () => {
+    setTrafficLoading(true);
+    setError(null);
+    try {
+      const { data } = await axiosClient.get('/admin/traffic-stats');
+      setTrafficStats(data?.data || null);
+    } catch (err) {
+      const message =
+        err.response?.data?.message || 'Unable to load traffic stats.';
+      setError(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setTrafficLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUsersList();
+  }, [loadUsersList]);
+
+  useEffect(() => {
+    loadTrafficStats();
+  }, [loadTrafficStats]);
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [userStatusFilter]);
 
   const approveOrReject = async (id, nextStatus) => {
     let adminNotes;
@@ -332,6 +393,36 @@ const AdminPage = () => {
     }
   };
 
+  const toggleUserStatus = async (userId, nextStatus) => {
+    const isDisable = nextStatus === UserStatus.Disabled;
+    if (
+      !window.confirm(
+        isDisable
+          ? 'Disable this account? They will be logged out and blocked from creating listings.'
+          : 'Re-enable this account?',
+      )
+    ) {
+      return;
+    }
+    setUserActionId(userId);
+    try {
+      const endpoint =
+        nextStatus === UserStatus.Disabled
+          ? `/admin/users/${userId}/disable`
+          : `/admin/users/${userId}/enable`;
+      const { data } = await axiosClient.patch(endpoint);
+      setUsers((prev) =>
+        prev.map((user) => (user.id === userId ? data.data : user)),
+      );
+    } catch (err) {
+      const message =
+        err.response?.data?.message || 'Unable to update user status.';
+      setError(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setUserActionId(null);
+    }
+  };
+
   const tenantUsers = useMemo(() => {
     if (userHighlights?.featuredTenants?.length) {
       return userHighlights.featuredTenants;
@@ -349,6 +440,36 @@ const AdminPage = () => {
       .filter((user) => user.role === UserRole.Landlord)
       .slice(0, 5);
   }, [userHighlights, users]);
+
+  const trafficByDay = useMemo(() => {
+    if (!trafficStats?.visitsByDay) return [];
+    return [...trafficStats.visitsByDay].sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+  }, [trafficStats]);
+
+  const maxVisitsByDay = useMemo(() => {
+    if (!trafficByDay.length) return 0;
+    return trafficByDay.reduce(
+      (max, item) => (item.count > max ? item.count : max),
+      0,
+    );
+  }, [trafficByDay]);
+
+  const userStatusOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All statuses' },
+      {
+        value: UserStatus.Active,
+        label: userStatusMeta[UserStatus.Active]?.label || 'Active',
+      },
+      {
+        value: UserStatus.Disabled,
+        label: userStatusMeta[UserStatus.Disabled]?.label || 'Disabled',
+      },
+    ],
+    [],
+  );
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10">
@@ -411,11 +532,282 @@ const AdminPage = () => {
             </div>
           )}
 
-          {/* ========== THÊM PHẦN DEPOSIT CONFIRMATION VÀO ĐÂY ========== */}
+          <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">Traffic &amp; visits</h2>
+                <p className="text-sm text-gray-500">
+                  Last 14 days of tracked page views (auto-captured on navigation).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadTrafficStats}
+                className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                disabled={trafficLoading}
+              >
+                {trafficLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            {trafficLoading ? (
+              <div className="mt-6 flex items-center gap-3 text-sm text-gray-500">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                Loading traffic stats...
+              </div>
+            ) : trafficStats ? (
+              <>
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Total visits</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-800">
+                      {trafficStats.totalVisits ?? 0}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Tracked days</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-800">
+                      {trafficByDay.length || 0}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Top page</p>
+                    <p className="mt-2 text-sm font-semibold text-gray-800 truncate">
+                      {trafficStats.topPages?.[0]?.path || '—'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Visits per day</h3>
+                      <span className="text-xs text-gray-500">Last {trafficByDay.length || 0} days</span>
+                    </div>
+                    {trafficByDay.length === 0 ? (
+                      <p className="mt-3 text-sm text-gray-500">No visits recorded yet.</p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {trafficByDay.map((item) => {
+                          const width =
+                            maxVisitsByDay > 0
+                              ? Math.max((item.count / maxVisitsByDay) * 100, 6)
+                              : 0;
+                          return (
+                            <div key={item.date} className="flex items-center gap-3">
+                              <span className="w-24 text-xs text-gray-500">
+                                {new Date(item.date).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                              <div className="h-2 flex-1 rounded-full bg-gray-100">
+                                <div
+                                  className="h-2 rounded-full bg-gradient-to-r from-primary to-amber-400"
+                                  style={{ width: `${width}%` }}
+                                ></div>
+                              </div>
+                              <span className="w-10 text-right text-xs font-semibold text-gray-700">
+                                {item.count}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Most viewed pages</h3>
+                      <span className="text-xs text-gray-500">Top 5</span>
+                    </div>
+                    {trafficStats.topPages?.length ? (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-gray-100">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
+                            <tr>
+                              <th className="px-4 py-2">Path</th>
+                              <th className="px-4 py-2 text-right">Views</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {trafficStats.topPages.map((page) => (
+                              <tr key={page.path} className="border-t border-gray-100 text-gray-700">
+                                <td className="px-4 py-2 font-medium">{page.path}</td>
+                                <td className="px-4 py-2 text-right font-semibold">{page.count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-gray-500">No page views recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="mt-4 text-sm text-gray-500">No traffic data yet.</p>
+            )}
+          </section>
+
+          <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">User management</h2>
+                <p className="text-sm text-gray-500">
+                  Tenant, landlord, and admin accounts with disable/enable controls.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={userStatusFilter}
+                  onChange={(e) => setUserStatusFilter(e.target.value)}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 focus:border-primary focus:outline-none"
+                >
+                  {userStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={loadUsersList}
+                  className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                  disabled={userTableLoading}
+                >
+                  {userTableLoading ? 'Refreshing...' : 'Refresh'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              {userTableLoading ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                  Loading users...
+                </div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-gray-400">
+                      <th className="px-3 py-2">Name</th>
+                      <th className="px-3 py-2">Role</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                          No users found for this filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      users.map((user) => {
+                        const statusBadge = userStatusMeta[user.status] || userStatusMeta[UserStatus.Active];
+                        return (
+                          <tr key={user.id} className="border-t border-gray-100 text-gray-700">
+                            <td className="px-3 py-3">
+                              <p className="font-semibold">{user.fullName}</p>
+                              <p className="text-xs text-gray-400">{user.email}</p>
+                            </td>
+                            <td className="px-3 py-3 capitalize">{user.role}</td>
+                            <td className="px-3 py-3">
+                              <span
+                                className={`rounded-full border px-2 py-1 text-xs font-semibold ${statusBadge?.badgeClass}`}
+                              >
+                                {statusBadge?.label || user.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-sm text-gray-600">
+                              {user.createdAt
+                                ? new Date(user.createdAt).toLocaleDateString()
+                                : '—'}
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleUserStatus(
+                                    user.id,
+                                    user.status === UserStatus.Disabled
+                                      ? UserStatus.Active
+                                      : UserStatus.Disabled,
+                                  )
+                                }
+                                disabled={userActionId === user.id || userTableLoading}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                                  user.status === UserStatus.Disabled
+                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                    : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                                } disabled:cursor-not-allowed disabled:opacity-60`}
+                              >
+                                {userActionId === user.id
+                                  ? 'Saving...'
+                                  : user.status === UserStatus.Disabled
+                                  ? 'Enable'
+                                  : 'Disable'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-500">
+                Page {userMeta.page || userPage} of{' '}
+                {Math.max(1, Math.ceil((userMeta.total || 0) / (userMeta.limit || 10)))}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUserPage((prev) => Math.max(1, prev - 1))}
+                  disabled={userPage <= 1 || userTableLoading}
+                  className="rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const totalPages = Math.max(
+                      1,
+                      Math.ceil((userMeta.total || 0) / (userMeta.limit || 10)),
+                    );
+                    setUserPage((prev) =>
+                      prev >= totalPages ? totalPages : prev + 1,
+                    );
+                  }}
+                  disabled={
+                    userTableLoading ||
+                    userPage >=
+                      Math.max(
+                        1,
+                        Math.ceil((userMeta.total || 0) / (userMeta.limit || 10)),
+                      )
+                  }
+                  className="rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Deposit confirmations */}
           <div className="mb-8">
             <AdminDepositConfirmation />
           </div>
-          {/* ============================================================= */}
+
 
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

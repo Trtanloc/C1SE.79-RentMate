@@ -6,6 +6,8 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 import { Property } from '../../properties/entities/property.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -13,6 +15,7 @@ import { Contract } from '../../contracts/entities/contract.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { LandlordApplication } from '../../landlord-applications/entities/landlord-application.entity';
 import { DepositContract } from '../../deposit/entities/deposit-contract.entity';
+import { UserStatus } from '../../common/enums/user-status.enum';
 
 @Entity({ name: 'users' })
 export class User {
@@ -60,6 +63,13 @@ export class User {
   })
   role: UserRole;
 
+  @Column({
+    type: 'enum',
+    enum: UserStatus,
+    default: UserStatus.Active,
+  })
+  status: UserStatus;
+
   @Column({ default: true })
   isActive: boolean;
 
@@ -95,4 +105,15 @@ export class User {
 
   @OneToMany(() => DepositContract, (contract) => contract.landlord)
   landlordDepositContracts: DepositContract[];
+
+  @BeforeInsert()
+  setInitialStatus() {
+    this.status = this.status ?? UserStatus.Active;
+    this.isActive = this.status === UserStatus.Active;
+  }
+
+  @BeforeUpdate()
+  syncStatusFlag() {
+    this.isActive = this.status !== UserStatus.Disabled;
+  }
 }

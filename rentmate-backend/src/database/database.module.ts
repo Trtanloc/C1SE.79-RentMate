@@ -10,6 +10,7 @@ import { Notification } from '../notifications/entities/notification.entity';
 import { Message } from '../messages/entities/message.entity';
 import { Testimonial } from '../testimonials/entities/testimonial.entity';
 import { DatabaseSeedService } from './database.seed.service';
+import { SchemaPatchService } from './schema-patch.service';
 
 @Module({
   imports: [
@@ -25,6 +26,6 @@ import { DatabaseSeedService } from './database.seed.service';
       Testimonial,
     ]),
   ],
-  providers: [DatabaseSeedService],
+  providers: [DatabaseSeedService, SchemaPatchService],
 })
 export class DatabaseModule {}

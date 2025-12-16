@@ -98,6 +98,12 @@ export class UsersController {
     ) {
       throw new ForbiddenException('You cannot change the user role');
     }
+    if (
+      actor.role !== UserRole.Admin &&
+      typeof updateUserDto.status !== 'undefined'
+    ) {
+      throw new ForbiddenException('You cannot change the user status');
+    }
 
     const payload: UpdateUserDto = { ...updateUserDto };
     if (typeof updateUserDto.password !== 'undefined') {
@@ -126,7 +132,7 @@ export class UsersController {
     await this.usersService.remove(id);
     return {
       success: true,
-      message: 'User deleted successfully',
+      message: 'User disabled successfully',
     };
   }
 

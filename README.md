@@ -60,7 +60,10 @@ API served at `http://localhost:3000/api`.
 - `GET /api/users` (admin)
 - `GET /api/users/:id`
 - `PUT /api/users/:id`
-- `DELETE /api/users/:id`
+- `DELETE /api/users/:id` (now performs a soft disable)
+- `GET /api/admin/users` (admin)
+- `PATCH /api/admin/users/:id/disable` (admin)
+- `PATCH /api/admin/users/:id/enable` (admin)
 - `GET /api/properties`
 - `GET /api/properties/:id`
 - `POST /api/properties` (landlord/admin)
@@ -72,6 +75,8 @@ API served at `http://localhost:3000/api`.
 - `GET /api/messages/:conversationId`
 - `POST /api/messages`
 - `POST /api/ai/chat`
+- `POST /api/stats/track-visit` (public; records a page view)
+- `GET /api/admin/traffic-stats` (admin)
 
 ### Backend Highlights
 - Global validation (`class-validator`) and serialization (`ClassSerializerInterceptor`)
@@ -120,3 +125,4 @@ Web app runs at `http://localhost:5173` with proxying to `/api`.
 - Use `npm run db:patch:hashed-tokens` (backend) to add hashed token columns if your DB predates this change.
 - Property deletion is implemented as a soft delete (status set to `deleted`); deleted/inactive listings are omitted from public searches and stats.
 - Stats and category aggregates are role-aware: tenants only see active listing counts; landlords see metrics for their own listings; admins retain full financial visibility.
+- Admin console now includes visit tracking (`/api/stats/track-visit` + `/api/admin/traffic-stats`) and user lifecycle controls (disable/enable instead of hard delete); disabled accounts cannot log in or perform protected actions.

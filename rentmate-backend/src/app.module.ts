@@ -40,6 +40,8 @@ import { ConversationsModule } from './conversations/conversations.module';
 import { DepositContract } from './deposit/entities/deposit-contract.entity';
 import { Payment } from './deposit/entities/payment.entity';
 import { DepositModule } from './deposit/deposit.module';
+import { Visit } from './stats/entities/visit.entity';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -82,6 +84,7 @@ import { DepositModule } from './deposit/deposit.module';
             Conversation,
             DepositContract,
             Payment,
+            Visit,
           ],
           synchronize:
             configService.get<string>(
@@ -113,6 +116,7 @@ import { DepositModule } from './deposit/deposit.module';
     ReviewsModule,
     ConversationsModule,
     DepositModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

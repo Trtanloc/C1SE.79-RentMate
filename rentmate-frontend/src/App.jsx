@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';
 import PropertyList from './pages/PropertyList.jsx';
@@ -21,8 +22,25 @@ import ContractPreviewPage from './pages/ContractPreview.jsx';
 import AuthSuccess from './pages/AuthSuccess.jsx';
 import PaymentPage from './pages/PaymentPage.jsx';
 import { UserRole } from './utils/constants.js';
+import axiosClient from './api/axiosClient.js';
 
 const App = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const track = async () => {
+      try {
+        await axiosClient.post('/stats/track-visit', {
+          path: `${location.pathname}${location.search}`,
+          referrer: document.referrer || undefined,
+        });
+      } catch {
+        // ignore tracking errors
+      }
+    };
+    track();
+  }, [location.pathname, location.search]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />

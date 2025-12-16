@@ -12,6 +12,7 @@ import {
   propertyTypeLabels,
 } from '../common/enums/property-type.enum';
 import { Transaction } from '../transactions/entities/transaction.entity';
+import { Visit } from './entities/visit.entity';
 
 @Injectable()
 export class StatsService {
@@ -24,6 +25,8 @@ export class StatsService {
     private readonly contractRepository: Repository<Contract>,
     @InjectRepository(Transaction)
     private readonly transactionsRepository: Repository<Transaction>,
+    @InjectRepository(Visit)
+    private readonly visitsRepository: Repository<Visit>,
   ) {}
 
   private buildPropertyQuery(user?: User) {
@@ -167,6 +170,70 @@ export class StatsService {
       activeListingsTrend,
       landlordTrend,
       occupancyRateTrend,
+    };
+  }
+
+  async recordVisit(
+    path: string,
+    user?: User,
+    metadata: { referrer?: string; userAgent?: string } = {},
+  ) {
+    if (!path) {
+      return;
+    }
+    try {
+      const visit = this.visitsRepository.create({
+        path: path.slice(0, 255),
+        userId: user?.id,
+        userRole: user?.role,
+        referrer: metadata.referrer?.slice(0, 255),
+        userAgent: metadata.userAgent?.slice(0, 255),
+      });
+      await this.visitsRepository.save(visit);
+    } catch (error) {
+      // Avoid blocking page loads if the table is not ready; log once.
+      // eslint-disable-next-line no-console
+      console.error('Failed to record visit', error?.message || error);
+    }
+  }
+
+  async getTrafficStats(rangeDays = 14) {
+    const since = new Date();
+    since.setDate(since.getDate() - Math.max(rangeDays - 1, 0));
+
+    const totalVisits = await this.visitsRepository.count();
+    const visitsByDayRaw = await this.visitsRepository
+      .createQueryBuilder('visit')
+      .select("DATE(visit.createdAt)", 'date')
+      .addSelect('COUNT(visit.id)', 'count')
+      .where('visit.createdAt >= :since', { since })
+      .groupBy('date')
+      .orderBy('date', 'ASC')
+      .getRawMany<{ date: string; count: string }>();
+
+    const visitsByDay = visitsByDayRaw.map((row) => ({
+      date: row.date,
+      count: Number(row.count ?? 0),
+    }));
+
+    const topPagesRaw = await this.visitsRepository
+      .createQueryBuilder('visit')
+      .select('visit.path', 'path')
+      .addSelect('COUNT(visit.id)', 'count')
+      .groupBy('visit.path')
+      .orderBy('count', 'DESC')
+      .limit(5)
+      .getRawMany<{ path: string; count: string }>();
+
+    const topPages = topPagesRaw.map((row) => ({
+      path: row.path,
+      count: Number(row.count ?? 0),
+    }));
+
+    return {
+      totalVisits,
+      visitsByDay,
+      topPages,
     };
   }
 
