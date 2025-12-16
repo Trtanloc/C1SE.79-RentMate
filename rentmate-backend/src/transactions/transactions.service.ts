@@ -78,10 +78,38 @@ export class TransactionsService {
     return this.transactionsRepository.save(preload);
   }
 
-  async remove(id: number) {
+  async remove(id: number, adminId?: number) {
     const transaction = await this.transactionsRepository.findOne({ where: { id } });
     if (!transaction) throw new NotFoundException(`Transaction ${id} not found`);
-    await this.transactionsRepository.remove(transaction);
+
+    const normalizedStatus = (transaction.status || '').toString().toLowerCase();
+    const isPaid =
+      normalizedStatus === TransactionStatus.Completed.toString().toLowerCase() ||
+      normalizedStatus === 'paid';
+    if (isPaid) {
+      throw new BadRequestException('Đã thanh toán – không thể xóa hoặc hủy');
+    }
+
+    const cancellable = [
+      TransactionStatus.Pending.toString().toLowerCase(),
+      TransactionStatus.Processing.toString().toLowerCase(),
+    ];
+
+    if (!cancellable.includes(normalizedStatus)) {
+      throw new BadRequestException('Chỉ hủy/xóa khoản chưa thanh toán');
+    }
+
+    transaction.status = TransactionStatus.Failed;
+    transaction.notes = transaction.notes
+      ? `${transaction.notes}\nCancelled by admin`
+      : 'Cancelled by admin';
+    transaction.metadata = JSON.stringify({
+      ...this.parseMetadata(transaction.metadata),
+      cancelledByAdminId: adminId,
+      cancelledAt: new Date().toISOString(),
+    });
+
+    return this.transactionsRepository.save(transaction);
   }
 
   // ==================== CÁC METHOD KHÁC ====================
@@ -260,5 +288,16 @@ export class TransactionsService {
       currency: 'VND',
       maximumFractionDigits: 0,
     }).format(value);
+  }
+
+  private parseMetadata(metadata?: string): Record<string, any> {
+    if (!metadata) {
+      return {};
+    }
+    try {
+      return JSON.parse(metadata);
+    } catch {
+      return {};
+    }
   }
 }

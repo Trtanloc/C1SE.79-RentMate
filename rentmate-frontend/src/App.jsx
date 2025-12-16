@@ -81,14 +81,14 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/payments"
-            element={
-              <ProtectedRoute>
-                <PaymentsPage />
-              </ProtectedRoute>
-            }
-          />
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute roles={[UserRole.Admin]}>
+            <PaymentsPage />
+          </ProtectedRoute>
+        }
+      />
           <Route
             path="/profile"
             element={

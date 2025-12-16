@@ -90,12 +90,6 @@ const Navbar = () => {
         icon: Sparkles,
       });
       items.push({
-        key: 'nav.payments',
-        fallback: 'Payments',
-        to: '/payments',
-        icon: BarChart3,
-      });
-      items.push({
         key: 'nav.contracts',
         fallback: 'Contracts',
         to: '/contracts',
@@ -120,6 +114,12 @@ const Navbar = () => {
           key: 'nav.admin',
           fallback: 'Admin',
           to: '/admin',
+          icon: BarChart3,
+        });
+        items.push({
+          key: 'nav.payments',
+          fallback: 'Payments',
+          to: '/payments',
           icon: BarChart3,
         });
       }
@@ -331,4 +331,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-
