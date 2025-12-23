@@ -10,6 +10,7 @@ export class SchemaPatchService implements OnModuleInit {
   async onModuleInit() {
     await this.ensureUserStatusColumn();
     await this.ensureVisitsTable();
+    await this.ensureReviewPropertyNullable();
   }
 
   private async ensureUserStatusColumn() {
@@ -41,6 +42,39 @@ export class SchemaPatchService implements OnModuleInit {
       `);
     } catch (error) {
       this.logger.error('Failed to ensure users.status column', error as any);
+    }
+  }
+
+  private async ensureReviewPropertyNullable() {
+    try {
+      const [column] = await this.dataSource.query(
+        `
+        SELECT IS_NULLABLE AS isNullable
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'reviews'
+          AND column_name = 'propertyId'
+        LIMIT 1
+      `,
+      );
+
+      const isNullable =
+        (column?.isNullable ?? column?.IS_NULLABLE ?? '').toString().toUpperCase();
+      if (!column || isNullable === 'YES') {
+        return;
+      }
+
+      this.logger.log(
+        'Applying schema patch: allowing NULL for reviews.propertyId (public testimonials)',
+      );
+      await this.dataSource.query(
+        'ALTER TABLE reviews MODIFY COLUMN propertyId INT NULL DEFAULT NULL',
+      );
+    } catch (error) {
+      this.logger.error(
+        'Failed to ensure reviews.propertyId is nullable',
+        error as any,
+      );
     }
   }
 

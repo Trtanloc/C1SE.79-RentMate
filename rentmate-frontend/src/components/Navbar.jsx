@@ -14,6 +14,7 @@ import {
   UserCircle,
   X,
   ScrollText,
+  ReceiptText,
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -107,6 +108,20 @@ const Navbar = () => {
           fallback: 'Apply landlord',
           to: '/apply-landlord',
           icon: Shield,
+        });
+        items.push({
+          key: 'nav.payments',
+          fallback: 'Payments',
+          to: '/payments',
+          icon: ReceiptText,
+        });
+      }
+      if (user?.role === UserRole.Landlord) {
+        items.push({
+          key: 'nav.payments',
+          fallback: 'Payments',
+          to: '/payments',
+          icon: ReceiptText,
         });
       }
       if (user?.role === UserRole.Admin) {

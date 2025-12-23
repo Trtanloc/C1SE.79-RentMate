@@ -123,7 +123,8 @@ export class ReviewsService implements OnModuleInit {
       avatarUrl: dto.avatarUrl || author?.avatarUrl,
       tenantId: author?.id,
       isPublic: true,
-      isApproved: false,
+      // Public testimonials show up immediately on the homepage
+      isApproved: true,
       propertyId: null,
     });
     return this.reviewsRepository.save(review);

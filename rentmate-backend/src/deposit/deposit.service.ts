@@ -488,6 +488,27 @@ const contractCode = `${cleanName}_${dto.amount}_${today}_${timestamp}`;
   }
 
   /**
+   * Get payment history for the current user
+   */
+  async getPaymentsByUser(userId: number, role: 'tenant' | 'landlord' = 'tenant') {
+    const qb = this.paymentRepo
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.contract', 'contract')
+      .leftJoinAndSelect('contract.property', 'property')
+      .leftJoinAndSelect('contract.tenant', 'tenant')
+      .leftJoinAndSelect('contract.landlord', 'landlord')
+      .orderBy('payment.created_at', 'DESC');
+
+    if (role === 'landlord') {
+      qb.where('contract.landlord_id = :userId', { userId });
+    } else {
+      qb.where('contract.tenant_id = :userId', { userId });
+    }
+
+    return qb.getMany();
+  }
+
+  /**
    * Webhook handler for MoMo
    */
   async handleMoMoWebhook(data: any) {

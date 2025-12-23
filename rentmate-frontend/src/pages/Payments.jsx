@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { UserRole } from '../utils/constants.js';
@@ -10,6 +11,8 @@ const statusBadges = {
   paid: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-rose-100 text-rose-700',
   failed: 'bg-rose-100 text-rose-700',
+  waiting_confirmation: 'bg-sky-100 text-sky-700',
+  expired: 'bg-gray-100 text-gray-700',
 };
 
 const PaymentsPage = () => {
@@ -21,18 +24,23 @@ const PaymentsPage = () => {
   const [actionId, setActionId] = useState(null);
 
   const isAdmin = user?.role === UserRole.Admin;
+  const isTenant = user?.role === UserRole.Tenant;
+  const isLandlord = user?.role === UserRole.Landlord;
 
   useEffect(() => {
     if (isAdmin) {
-      fetchPayments();
+      fetchAdminPayments();
+    } else if (isTenant || isLandlord) {
+      fetchMyPayments(isLandlord ? 'landlord' : 'tenant');
     } else {
       setLoading(false);
     }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, isTenant, isLandlord]);
 
   const isPaidStatus = (status) => ['paid', 'completed'].includes((status || '').toLowerCase());
 
-  const fetchPayments = async (keyword = '') => {
+  const fetchAdminPayments = async (keyword = '') => {
     setLoading(true);
     setError(null);
     try {
@@ -40,7 +48,23 @@ const PaymentsPage = () => {
       const { data } = await axiosClient.get('/admin/payments', { params });
       setPayments(data?.data || []);
     } catch (err) {
-      const message = err?.response?.data?.message || 'Không thể tải danh sách thanh toán.';
+      const message = err?.response?.data?.message || 'Không tải được danh sách thanh toán.';
+      setError(Array.isArray(message) ? message.join(', ') : message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMyPayments = async (role = 'tenant') => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await axiosClient.get('/deposit/my-payments', {
+        params: { role },
+      });
+      setPayments(data?.data || []);
+    } catch (err) {
+      const message = err?.response?.data?.message || 'Không tải được lịch sử thanh toán.';
       setError(Array.isArray(message) ? message.join(', ') : message);
     } finally {
       setLoading(false);
@@ -49,7 +73,7 @@ const PaymentsPage = () => {
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
-    fetchPayments(search);
+    fetchAdminPayments(search);
   };
 
   const handleCancel = async (id) => {
@@ -57,9 +81,9 @@ const PaymentsPage = () => {
     setActionId(id);
     try {
       await axiosClient.patch(`/admin/payments/${id}/cancel`);
-      await fetchPayments(search);
+      await fetchAdminPayments(search);
     } catch (err) {
-      alert(err?.response?.data?.message || 'Không thể hủy thanh toán');
+      alert(err?.response?.data?.message || 'Không hủy được thanh toán');
     } finally {
       setActionId(null);
     }
@@ -70,9 +94,9 @@ const PaymentsPage = () => {
     setActionId(id);
     try {
       await axiosClient.delete(`/admin/payments/${id}`);
-      await fetchPayments(search);
+      await fetchAdminPayments(search);
     } catch (err) {
-      alert(err?.response?.data?.message || 'Không thể xóa thanh toán');
+      alert(err?.response?.data?.message || 'Không xóa được thanh toán');
     } finally {
       setActionId(null);
     }
@@ -85,12 +109,111 @@ const PaymentsPage = () => {
       maximumFractionDigits: 0,
     }).format(amount || 0);
 
+  const formatMethod = (method) => {
+    const value = (method || '').toLowerCase();
+    if (value.includes('momo')) return 'MoMo';
+    if (value.includes('vnpay')) return 'VNPay';
+    if (value.includes('bank')) return 'Chuyển khoản';
+    return method || 'N/A';
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '—';
+    try {
+      return new Date(value).toLocaleString('vi-VN');
+    } catch {
+      return value;
+    }
+  };
+
   if (!isAdmin) {
+    const roleLabel = isLandlord ? 'chủ nhà' : 'khách thuê';
     return (
-      <section className="mx-auto max-w-4xl px-4 py-10">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-800">
-          Bạn không có quyền truy cập trang quản lý thanh toán.
+      <section className="mx-auto max-w-5xl px-4 py-10">
+        <div className="mb-6 flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Payments</p>
+          <h1 className="text-3xl font-semibold text-gray-800">Lịch sử thanh toán</h1>
+          <p className="text-sm text-gray-500">
+            {`Bạn đang xem các khoản thanh toán với vai trò ${roleLabel}.`}
+          </p>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-500">Đang tải...</div>
+        ) : payments.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-gray-500">
+            Chưa có thanh toán nào.
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {payments.map((payment) => {
+              const contract = payment.contract || {};
+              const property = contract.property || {};
+              const tenantName = contract.tenant?.fullName;
+              const badgeClass =
+                statusBadges[(payment.status || '').toLowerCase()] || 'bg-gray-100 text-gray-700';
+
+              return (
+                <div key={payment.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Mã hợp đồng</p>
+                      <p className="text-lg font-semibold text-gray-900">{contract.contract_code || '—'}</p>
+                      <p className="text-sm text-gray-600">{property.title || 'Không rõ tên tài sản'}</p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+                      {payment.status || 'N/A'}
+                    </span>
+                  </div>
+
+                  {isLandlord && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Khách thuê:{' '}
+                      <span className="font-semibold text-gray-800">{tenantName || '—'}</span>
+                    </p>
+                  )}
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Số tiền</span>
+                      <span className="text-base font-semibold text-gray-900">{formatCurrency(payment.amount)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Phương thức</span>
+                      <span className="text-base font-semibold text-gray-900">
+                        {formatMethod(payment.payment_method)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase tracking-[0.15em] text-gray-500">Ngày tạo</span>
+                      <span className="text-base font-semibold text-gray-900">{formatDate(payment.created_at)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      to={`/payment/${contract.contract_code}`}
+                      className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                    >
+                      Xem chi tiết
+                    </Link>
+                    {payment.gateway_response?.contractCode && (
+                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">
+                        {payment.gateway_response.contractCode}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     );
   }
@@ -122,7 +245,7 @@ const PaymentsPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => fetchPayments(search)}
+              onClick={() => fetchAdminPayments(search)}
               className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-primary hover:text-primary"
             >
               Làm mới
@@ -177,8 +300,8 @@ const PaymentsPage = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {paid ? (
-                        <span className="text-xs text-gray-500" title="Đã thanh toán – không thể xóa">
-                          Đã thanh toán – không thể xóa
+                        <span className="text-xs text-gray-500" title="Đã thanh toán nên không thể xóa">
+                          Đã thanh toán
                         </span>
                       ) : (
                         <div className="flex flex-wrap justify-end gap-2">

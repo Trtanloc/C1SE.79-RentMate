@@ -94,6 +94,22 @@ async manualConfirmPayment(
     };
   }
 
+  @Get('my-payments')
+  async getMyPayments(
+    @Req() req: Request,
+    @Query('role') role: 'tenant' | 'landlord' = 'tenant',
+  ) {
+    const userId = (req.user as any).id;
+    const roleValue = role === 'landlord' ? 'landlord' : 'tenant';
+    const payments = await this.depositService.getPaymentsByUser(userId, roleValue);
+
+    return {
+      success: true,
+      data: payments,
+      count: payments.length,
+    };
+  }
+
   @Delete('cancel/:code')
   async cancelContract(@Param('code') code: string, @Req() req: Request) {
     const userId = (req.user as any).id;
