@@ -54,15 +54,14 @@ export const toGoogleMapsEmbedUrl = (input, fallbackQuery) => {
   }
 
   if (url && url.hostname.includes('google.')) {
+    // Prefer explicit coordinates for precise pin placement; otherwise use place/address query.
     const latLng = parseLatLngFromPath(url.pathname);
-    if (latLng) {
-      return buildViewEmbed(latLng);
-    }
+    if (latLng) return buildPlaceEmbed(`${latLng.lat},${latLng.lng}`);
+
     const placeQuery = parsePlaceQuery(url.pathname);
     const q = placeQuery || url.searchParams.get('q') || fallback;
-    if (q) {
-      return buildPlaceEmbed(q);
-    }
+    if (q) return buildPlaceEmbed(q);
+
     return raw || fallback;
   }
 
