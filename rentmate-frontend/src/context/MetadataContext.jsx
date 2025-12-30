@@ -14,6 +14,8 @@ import {
   notificationTypeMeta as notificationMetaFallback,
 } from '../utils/constants.js';
 import { fallbackCities } from '../utils/cities.js';
+import { mapPropertyTypeOptions } from '../utils/propertyTypeLabels.js';
+import { useI18n } from '../i18n/useI18n.js';
 
 const MetadataContext = createContext({
   propertyTypes: [],
@@ -34,8 +36,12 @@ const MetadataContext = createContext({
 const normalizeArray = (value) => (Array.isArray(value) ? value : []);
 const sanitizeStrings = (list) =>
   normalizeArray(list)
-    .filter((item) => typeof item === 'string')
-    .map((item) => item.trim())
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object' && item.value) return item.value;
+      return '';
+    })
+    .map((item) => String(item || '').trim())
     .filter(Boolean);
 
 const stripAccentsLower = (value = '') =>
@@ -58,7 +64,8 @@ const mergeCities = (fetched = []) => {
   return merged;
 };
 
-export const MetadataProvider = ({ children }) => {
+export function MetadataProvider({ children }) {
+  const { t, lang } = useI18n();
   const [state, setState] = useState({
     propertyTypes: [],
     propertyStatuses: [],
@@ -77,7 +84,8 @@ export const MetadataProvider = ({ children }) => {
     try {
       const data = await fetchMetadataFilters();
       setState({
-        propertyTypes: normalizeArray(data?.propertyTypes),
+        // Apply a shared mapping so UI labels stay localized while values remain enum strings.
+        propertyTypes: sanitizeStrings(data?.propertyTypes),
         propertyStatuses: normalizeArray(data?.propertyStatuses),
         notificationTypes: normalizeArray(data?.notificationTypes),
         landlordApplicationStatuses: normalizeArray(data?.landlordApplicationStatuses),
@@ -132,20 +140,27 @@ export const MetadataProvider = ({ children }) => {
     return base;
   }, [state.landlordApplicationStatuses]);
 
+  const propertyTypes = useMemo(
+    () => mapPropertyTypeOptions(state.propertyTypes, t, lang),
+    [state.propertyTypes, t, lang],
+  );
+
   const value = useMemo(
     () => ({
       ...state,
+      propertyTypes,
       loading,
       error,
       refresh,
       propertyStatusMeta,
       notificationTypeMeta,
       landlordStatusMeta,
-      defaultPropertyType: state.propertyTypes[0]?.value,
+      defaultPropertyType: propertyTypes[0]?.value,
       defaultPropertyStatus: state.propertyStatuses[0]?.value || PropertyStatus.Available,
     }),
     [
       state,
+      propertyTypes,
       loading,
       error,
       refresh,
@@ -156,6 +171,8 @@ export const MetadataProvider = ({ children }) => {
   );
 
   return <MetadataContext.Provider value={value}>{children}</MetadataContext.Provider>;
-};
+}
 
-export const useMetadata = () => useContext(MetadataContext);
+export function useMetadata() {
+  return useContext(MetadataContext);
+}

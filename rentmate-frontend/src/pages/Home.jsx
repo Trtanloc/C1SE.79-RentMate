@@ -16,8 +16,7 @@ import { useMetadata } from '../context/MetadataContext.jsx';
 import { useI18n } from '../i18n/useI18n.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { UserRole } from '../utils/constants.js';
-
-const defaultMetrics = [{ label: 'Active listings', value: '--' }];
+import { getPropertyTypeLabel } from '../utils/propertyTypeLabels.js';
 
 const HotDealBanner = ({ onView }) => {
   const { t } = useI18n();
@@ -77,7 +76,6 @@ const Home = () => {
   const { t } = useI18n();
   const { user } = useAuth();
   const role = user?.role ?? UserRole.Tenant;
-  const canViewFinancial = role === UserRole.Admin || role === UserRole.Landlord;
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -128,7 +126,13 @@ const Home = () => {
     const loadCategories = async () => {
       try {
         const data = await fetchCategoryHighlights();
-        setCategories(data);
+        setCategories(
+          (data || []).map((item) => ({
+            ...item,
+            label: getPropertyTypeLabel(item?.type, t, item?.label || item?.type),
+            description: t(`propertyTypeDesc.${item?.type}`, item?.description),
+          })),
+        );
         setCategoryError(null);
       } catch (err) {
         setCategories([]);
@@ -149,7 +153,7 @@ const Home = () => {
 
     loadCategories();
     loadTestimonials();
-  }, []);
+  }, [t]);
 
   const featuredProperty = useMemo(() => {
     if (!Array.isArray(properties) || properties.length === 0) {
@@ -185,11 +189,11 @@ const Home = () => {
       if (role === UserRole.Admin || role === UserRole.Landlord) {
         return [
           activeMetric,
-          { label: t('home.metrics.contracts', 'Contracts created'), value: '--' },
-          { label: t('home.metrics.landlords', 'Verified landlords'), value: '--' },
+          { label: t('home.metrics.contracts'), value: '--' },
+          { label: t('home.metrics.landlords'), value: '--' },
         ];
       }
-      return defaultMetrics;
+      return [activeMetric];
     }
 
     if (role === UserRole.Landlord) {
@@ -245,7 +249,6 @@ const Home = () => {
         categories={categories}
         error={categoryError}
         onSelect={handleCategorySelect}
-        canViewFinancial={canViewFinancial}
       />
       <PropertyShowcase properties={properties} loading={loading} error={error} />
       <Testimonials items={testimonials} error={testimonialError} />

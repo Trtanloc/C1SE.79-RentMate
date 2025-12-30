@@ -41,6 +41,10 @@ const getPrimaryPhoto = (property) => {
     property.imageUrl ||
     property.heroImage ||
     (Array.isArray(property.imageUrls) && property.imageUrls[0]) ||
+    (Array.isArray(property.images) &&
+      property.images
+        .map((item) => (typeof item === 'string' ? item : item?.url || item?.path || item?.image))
+        .filter(Boolean)[0]) ||
     (Array.isArray(property.photos) &&
       property.photos
         .map((item) => (typeof item === 'string' ? item : item?.url))

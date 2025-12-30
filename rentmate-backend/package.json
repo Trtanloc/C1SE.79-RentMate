@@ -8,7 +8,8 @@
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "format": "prettier --write \"src/**/*.ts\"",
-    "db:patch:hashed-tokens": "node scripts/patch-hashed-tokens.js"
+    "db:patch:hashed-tokens": "node scripts/patch-hashed-tokens.js",
+    "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts"
   },
   "keywords": [
     "nest",
@@ -18,6 +19,7 @@
   "author": "C1SE.79 Team",
   "license": "MIT",
   "dependencies": {
+    "@faker-js/faker": "^10.1.0",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",

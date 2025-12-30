@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useI18n } from '../i18n/useI18n.js';
 
 const AuthSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login } = useAuth();
+  const { t } = useI18n();
   const [status, setStatus] = useState('processing'); // processing | success | error
-  const [message, setMessage] = useState('Đang xác thực tài khoản của bạn...');
+  const [message, setMessage] = useState(t('auth.processingMessage'));
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -17,23 +19,22 @@ const AuthSuccess = () => {
 
     if (!token) {
       setStatus('error');
-      setMessage('Thiếu mã đăng nhập từ Facebook.');
+      setMessage(t('auth.error.missingToken'));
       return;
     }
 
     const sync = async () => {
       try {
-        // Temporarily set token so axios attaches the Authorization header
         sessionStorage.setItem('rentmate_token', token);
         const payload = JSON.parse(atob(token.split('.')[1] || ''));
         const userId = payload?.sub;
         if (!userId) {
-          throw new Error('Token không hợp lệ, vui lòng thử lại.');
+          throw new Error(t('auth.error.invalidToken'));
         }
         const { data } = await axiosClient.get(`/users/${userId}`);
         login(data.data, token, { remember: true, expiresAt });
         setStatus('success');
-        setMessage('Đăng nhập thành công! Đang chuyển hướng...');
+        setMessage(t('auth.success.message'));
         setTimeout(() => navigate(returnUrl, { replace: true }), 800);
       } catch (error) {
         sessionStorage.removeItem('rentmate_token');
@@ -41,16 +42,14 @@ const AuthSuccess = () => {
         sessionStorage.removeItem('rentmate_user');
         localStorage.removeItem('rentmate_user');
         const fallback =
-          error?.response?.data?.message ||
-          error?.message ||
-          'Không thể hoàn tất đăng nhập Facebook.';
+          error?.response?.data?.message || error?.message || t('auth.error.generic');
         setStatus('error');
         setMessage(Array.isArray(fallback) ? fallback.join(', ') : fallback);
       }
     };
 
     sync();
-  }, [login, navigate, searchParams]);
+  }, [login, navigate, searchParams, t]);
 
   const isError = status === 'error';
   const isSuccess = status === 'success';
@@ -63,10 +62,10 @@ const AuthSuccess = () => {
         </div>
         <h1 className="mb-2 text-2xl font-semibold text-gray-800">
           {isSuccess
-            ? 'Đăng nhập Facebook thành công'
+            ? t('auth.title.success')
             : isError
-              ? 'Không thể đăng nhập'
-              : 'Đang xử lý đăng nhập Facebook'}
+              ? t('auth.title.error')
+              : t('auth.title.processing')}
         </h1>
         <p className="text-sm text-gray-600">{message}</p>
         {isError && (
@@ -76,14 +75,14 @@ const AuthSuccess = () => {
               onClick={() => navigate('/login')}
               className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90"
             >
-              Quay lại trang đăng nhập
+              {t('auth.action.backLogin')}
             </button>
             <button
               type="button"
               onClick={() => navigate('/')}
               className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
             >
-              Về trang chủ
+              {t('auth.action.home')}
             </button>
           </div>
         )}

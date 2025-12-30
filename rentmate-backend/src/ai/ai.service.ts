@@ -19,6 +19,7 @@ import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageSender } from '../common/enums/message-sender.enum';
 import { PropertyStatus } from '../common/enums/property-status.enum';
 import { detectVietnamCity } from '../common/constants/vietnam-cities';
+import { PropertyType } from '../common/enums/property-type.enum';
 
 type GeminiCandidate = {
   content?: {
@@ -29,6 +30,7 @@ type GeminiCandidate = {
 type ContextResult = {
   source: 'database+gemini';
   context: string;
+  propertyBlock: string | null;
 };
 
 type TenantContext = {
@@ -37,11 +39,15 @@ type TenantContext = {
 };
 
 type RecommendationFilters = {
+  intent: 'search_property' | 'unknown';
   normalized: string;
-  mentionsProperty: boolean;
-  mentionsPrice: boolean;
-  maxBudget?: number;
-  city?: string;
+  types: PropertyType[];
+  priceMin?: number | null;
+  priceMax?: number | null;
+  city?: string | null;
+  district?: string | null;
+  bedroomsMin?: number | null;
+  bathroomsMin?: number | null;
   requestedAmenities: string[];
   shouldSearch: boolean;
 };
@@ -146,11 +152,12 @@ export class AiService {
       trimmedMessage,
       user.id,
     );
-    const prompt = this.buildPrompt(
-      trimmedMessage,
-      user.fullName,
-      contextResult?.context,
-    );
+    const prompt = this.buildPrompt({
+      message: trimmedMessage,
+      tenantName: user.fullName,
+      propertyBlock: contextResult?.propertyBlock ?? null,
+      fallbackContext: contextResult?.context ?? null,
+    });
     this.logger.log('Sending data to Gemini API');
     const reply = await this.requestGemini(prompt);
 
@@ -173,25 +180,35 @@ export class AiService {
     return `tenant-${senderId}`;
   }
 
-  private buildPrompt(
-    message: string,
-    tenantName?: string,
-    context?: string,
-  ): string {
+  private buildPrompt(options: {
+    message: string;
+    tenantName?: string;
+    propertyBlock?: string | null;
+    fallbackContext?: string | null;
+  }): string {
     const persona =
-      'Bạn là "RentMate Virtual Assistant" – giúp người thuê nhà tra cứu thông tin, hỏi về hợp đồng, thanh toán và gợi ý bất động sản phù hợp. Giữ giọng điệu thân thiện, súc tích, ưu tiên tiếng Việt và chỉ chuyển sang tiếng Anh khi người dùng hỏi bằng tiếng Anh.';
-    const contextBlock = context
-      ? `Dữ liệu nội bộ cần ưu tiên trả lời:\n${context}`
-      : 'Không có dữ liệu nội bộ phù hợp, hãy dựa vào kiến thức chung của bạn.';
+      'Ban la "RentMate Virtual Assistant" - chi giai thich cac bat dong san da duoc he thong loc va xep hang. Khong tu them bat dong san moi, khong de xuat loai hinh khac khi nguoi dung da chi ro. Uu tien tieng Viet.';
+    // Gemini only explains the vetted list; it must not add, rank, or broaden beyond backend selection.
+    const propertyBlock = options.propertyBlock
+      ? `Danh sach bat dong san duoc he thong loc (WHERE) va xep hang (TOPSIS + K-means). Chi duoc giai thich cac muc sau:
+${options.propertyBlock}`
+      : 'Khong co bat dong san nao duoc chon tu bo loc hien tai. Neu nguoi dung dang tim nha, hoi ho co muon mo rong loai hinh hoac dieu chinh ngan sach khong.';
+    const fallbackBlock =
+      !options.propertyBlock && options.fallbackContext
+        ? `Thong tin he thong khac:
+${options.fallbackContext}
+`
+        : '';
 
     return `${persona}
-Tên người thuê: ${tenantName ?? 'Khách'}.
-${contextBlock}
+Ten nguoi thue: ${options.tenantName ?? 'Khach'}.
+${propertyBlock}
+${fallbackBlock}Chi dan he thong: Chi giai thich ly do cac bat dong san tren phu hop voi yeu cau (gia, khu vuc, phong, tien ich). Khong duoc tu y de xuat bat dong san moi hay loai hinh khac.
 
-Câu hỏi của người dùng:
-${message}
+Cau hoi nguoi dung:
+${options.message}
 
-Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đầu dòng khi hữu ích.`;
+Tra loi ngan gon 2-3 doan, dung gach dau dong neu huu ich.`;
   }
 
   private async requestGemini(prompt: string): Promise<string> {
@@ -240,11 +257,13 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     tenantId: number,
   ): Promise<ContextResult | null> {
     const sections: string[] = [];
-
-    const propertyRecommendations =
-      await this.gatherPropertyRecommendations(message);
-    if (propertyRecommendations) {
-      sections.push(propertyRecommendations);
+    const filters = this.extractRecommendationFilters(message);
+    const propertyRecommendations = await this.gatherPropertyRecommendations(
+      message,
+      filters,
+    );
+    if (propertyRecommendations.block) {
+      sections.push(propertyRecommendations.block);
     }
 
     const contractStatus = await this.lookupLatestContractStatus(
@@ -270,33 +289,30 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     return {
       source: 'database+gemini',
       context: sections.join('\n\n'),
+      propertyBlock: propertyRecommendations.block,
     };
   }
 
 
   private async gatherPropertyRecommendations(
     message: string,
-  ): Promise<string | null> {
-    const filters = this.parseRecommendationFilters(message);
+    filters: RecommendationFilters,
+  ): Promise<{ block: string | null }> {
     if (!filters.shouldSearch) {
-      return null;
+      return { block: null };
     }
 
     await this.ensureDatabaseConnection({ skipLog: true });
 
     try {
       const properties = await this.fetchCandidateProperties(filters);
-      this.logger.log(`Retrieved ${properties.length} properties`);
+      this.logger.log(`Retrieved ${properties.length} properties with hard filters`);
 
       const dataset = this.prepareDataset(properties, filters);
       if (!dataset.records.length) {
-        return `Kh?ng c? b?t d?ng s?n ph? h?p${
-          filters.city ? ` t?i ${filters.city}` : ''
-        }${
-          filters.maxBudget
-            ? ` v?i ng?n s?ch ${this.formatCurrency(filters.maxBudget)}`
-            : ''
-        }.`;
+        return { block: `Khong tim thay bat dong san phu hop${this.describeFilterSummary(
+          filters,
+        )}. Ban co muon mo rong loai hinh hoac dieu chinh ngan sach khong?` };
       }
 
       const clusterMapping = this.clusterProperties(dataset);
@@ -316,65 +332,239 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       const clusterSummary = this.describeClusterSummary(ranked);
 
       const lines = ranked.map((item, index) => {
-        const ownerName = item.property.owner?.fullName ?? 'Chua c?p nh?t';
-        return `${index + 1}. ${item.property.title} (${item.property.address})   ${this.formatCurrency(
+        const ownerName = item.property.owner?.fullName ?? 'Chua cap nhat';
+        return `${index + 1}. [${item.property.type}] ${item.property.title} (${item.property.address}) - ${this.formatCurrency(
           Number(item.property.price),
-        )}/th?ng, di?n t?ch ${item.property.area}m2, ch? nh?: ${ownerName}, Di?m TOPSIS: ${item.score}, Cum: ${item.cluster}`;
+        )}/thang, dien tich ${item.property.area}m2, chu nha: ${ownerName}, Diem TOPSIS: ${item.score}, Cum: ${item.cluster}`;
       });
 
-      return [
-        'G?i y b?t d?ng s?n t? co s? d? li?u + TOPSIS (AHP + K-means):',
-        ...lines,
-        clusterSummary,
-      ].join('\n');
+      return {
+        block: [
+          'Danh sach bat dong san da loc (WHERE) + xep hang (TOPSIS + K-means):',
+          ...lines,
+          clusterSummary,
+          'Chi giai thich cac bat dong san tren, khong them bat ky loai hinh nao khac.',
+        ].join('\n'),
+      };
     } catch (error) {
       this.logger.error('Failed to gather property recommendations', error);
-      return 'Ch?ng t?i t?m th?i kh?ng truy v?n du?c d? li?u b?t d?ng s?n. Vui l?ng th? l?i sau.';
+      return {
+        block:
+          'Chung toi tam thoi khong truy van duoc du lieu bat dong san. Vui long thu lai sau.',
+      };
     }
   }
 
-  private parseRecommendationFilters(message: string): RecommendationFilters {
-    const normalized = message.toLowerCase();
-    const mentionsProperty =
-      /(can ho|can h?|chung cu|apartment|nha thue|thu? nh?|property|bat dong san|b?t d?ng s?n)/.test(
-        normalized,
-      );
-    const mentionsPrice =
-      /(gia|price|bao nhieu|duoi|tam|khoang|budget)/.test(normalized);
-    const maxBudget = this.extractBudget(message);
-    const city = this.extractCity(message);
+  private extractRecommendationFilters(message: string): RecommendationFilters {
+    // Deterministically parse user intent and hard filters before touching the database.
+    const normalized = this.normalizeMessage(message);
+    const types = this.extractPropertyTypes(normalized);
+    const budget = this.extractBudgetRange(message, normalized);
+    const city = this.extractCity(message) ?? null;
+    const district = this.extractDistrict(message) ?? null;
     const requestedAmenities = this.extractAmenities(message);
+    const bedroomsMin = this.extractRoomCount(normalized, /(phong ngu|pn|bed)/);
+    const bathroomsMin = this.extractRoomCount(normalized, /(phong tam|toilet|wc|bath)/);
+    const mentionsProperty = this.detectPropertyIntent(normalized);
+
+    const shouldSearch =
+      mentionsProperty ||
+      types.length > 0 ||
+      budget.min !== null ||
+      budget.max !== null ||
+      Boolean(city) ||
+      Boolean(district) ||
+      bedroomsMin !== null ||
+      bathroomsMin !== null ||
+      requestedAmenities.length > 0;
 
     return {
+      intent: shouldSearch ? 'search_property' : 'unknown',
       normalized,
-      mentionsProperty,
-      mentionsPrice,
-      maxBudget,
+      types,
+      priceMin: budget.min,
+      priceMax: budget.max,
       city,
+      district,
+      bedroomsMin,
+      bathroomsMin,
       requestedAmenities,
-      shouldSearch:
-        mentionsProperty ||
-        mentionsPrice ||
-        typeof maxBudget === 'number' ||
-        Boolean(city) ||
-        requestedAmenities.length > 0,
+      shouldSearch,
     };
+  }
+
+  private detectPropertyIntent(normalized: string): boolean {
+    return /(can ho|chung cu|apartment|nha|nha pho|nha rieng|bat dong san|studio|office|van phong|thue nha|tim nha|phong tro)/.test(
+      normalized,
+    );
+  }
+
+  private extractPropertyTypes(normalized: string): PropertyType[] {
+    const matches: PropertyType[] = [];
+
+    const typeChecks: Array<{ pattern: RegExp; type: PropertyType }> = [
+      { pattern: /(nha|nha pho|nha nguyen can|nha rieng|can nha)/, type: PropertyType.House },
+      { pattern: /(studio|phong studio)/, type: PropertyType.Studio },
+      { pattern: /(can ho|chung cu|apartment)/, type: PropertyType.Apartment },
+      { pattern: /(condo)/, type: PropertyType.Condo },
+      { pattern: /(van phong|office)/, type: PropertyType.Office },
+    ];
+
+    typeChecks.forEach((check) => {
+      if (check.pattern.test(normalized)) {
+        matches.push(check.type);
+      }
+    });
+
+    // Deduplicate while preserving order.
+    return Array.from(new Set(matches));
+  }
+
+  private extractBudgetRange(
+    message: string,
+    normalizedMessage?: string,
+  ): { min: number | null; max: number | null } {
+    const normalized = normalizedMessage ?? this.normalizeMessage(message);
+    const approxRegex =
+      /(tam|khoang|around|approx)\s*(\d+(?:[.,]\d+)?)(?:\s*)(trieu|tr|trieu|million|ty|nghin|ngan|k)?/i;
+    const belowRegex =
+      /(duoi|under|toi da|toida|<=|<|max)\s*(\d+(?:[.,]\d+)?)(?:\s*)(trieu|tr|trieu|million|ty|nghin|ngan|k)?/i;
+    const aboveRegex =
+      /(tren|above|>=|>|it nhat|toi thieu)\s*(\d+(?:[.,]\d+)?)(?:\s*)(trieu|tr|trieu|million|ty|nghin|ngan|k)?/i;
+
+    const normalizeValue = (value: number, unit?: string | null) =>
+      this.normalizeBudgetValue(value, unit);
+
+    const approxMatch = normalized.match(approxRegex);
+    if (approxMatch) {
+      const base = normalizeValue(parseFloat(approxMatch[2].replace(',', '.')), approxMatch[3]);
+      return {
+        min: Math.round(base * 0.8),
+        max: Math.round(base * 1.2),
+      };
+    }
+
+    const belowMatch = normalized.match(belowRegex);
+    if (belowMatch) {
+      const max = normalizeValue(parseFloat(belowMatch[2].replace(',', '.')), belowMatch[3]);
+      return { min: null, max };
+    }
+
+    const aboveMatch = normalized.match(aboveRegex);
+    if (aboveMatch) {
+      const min = normalizeValue(parseFloat(aboveMatch[2].replace(',', '.')), aboveMatch[3]);
+      return { min, max: null };
+    }
+
+    const looseMatch =
+      normalized.match(/(\d+(?:[.,]\d+)?)(?:\s*)(trieu|tr|trieu|million|ty|nghin|ngan|k)?/) || [];
+    if (looseMatch.length) {
+      const value = normalizeValue(parseFloat(looseMatch[1].replace(',', '.')), looseMatch[2]);
+      return { min: null, max: value };
+    }
+
+    return { min: null, max: null };
+  }
+
+  private normalizeBudgetValue(value: number, unit?: string | null): number {
+    if (!unit) {
+      return value * 1_000_000;
+    }
+    const normalizedUnit = unit.toLowerCase();
+    if (normalizedUnit.includes('tri') || normalizedUnit === 'tr' || normalizedUnit === 'trieu' || normalizedUnit === 'million') {
+      return value * 1_000_000;
+    }
+    if (normalizedUnit.includes('ty')) {
+      return value * 1_000_000_000;
+    }
+    if (
+      normalizedUnit.includes('nghin') ||
+      normalizedUnit.includes('ngan') ||
+      normalizedUnit === 'k'
+    ) {
+      return value * 1_000;
+    }
+    return value;
+  }
+
+  private extractDistrict(message: string): string | null {
+    const match =
+      message.match(/qu[aâ]n\s+([\p{L}\s]+?)(?=[,.;!?]|$)/iu) ??
+      message.match(/district\s+([\p{L}\s]+?)(?=[,.;!?]|$)/iu);
+    if (match) {
+      return match[1].trim();
+    }
+
+    const normalized = this.normalizeMessage(message);
+    const normalizedMatch = normalized.match(/quan\s+([a-z\s]+?)(?=[,.;!?]|$)/i);
+    return normalizedMatch ? normalizedMatch[1].trim() : null;
+  }
+
+  private extractRoomCount(
+    normalized: string,
+    pattern: RegExp,
+  ): number | null {
+    const match = normalized.match(new RegExp(`(\\d+)\\s*${pattern.source}`, pattern.flags));
+    if (match) {
+      return Number.parseInt(match[1], 10);
+    }
+    return null;
+  }
+
+  private describeFilterSummary(filters: RecommendationFilters): string {
+    const parts: string[] = [];
+    if (filters.types.length) {
+      parts.push(`loai ${filters.types.join(', ')}`);
+    }
+    if (filters.city) {
+      parts.push(`tai ${filters.city}`);
+    }
+    if (filters.district) {
+      parts.push(`quan ${filters.district}`);
+    }
+    if (filters.priceMin !== null && filters.priceMin !== undefined) {
+      parts.push(`gia tu ${this.formatCurrency(filters.priceMin)}`);
+    }
+    if (filters.priceMax !== null && filters.priceMax !== undefined) {
+      parts.push(`gia den ${this.formatCurrency(filters.priceMax)}`);
+    }
+    if (filters.bedroomsMin !== null && filters.bedroomsMin !== undefined) {
+      parts.push(`>= ${filters.bedroomsMin} phong ngu`);
+    }
+    if (filters.bathroomsMin !== null && filters.bathroomsMin !== undefined) {
+      parts.push(`>= ${filters.bathroomsMin} phong tam`);
+    }
+    return parts.length ? ` theo tieu chi ${parts.join(', ')}` : '';
   }
 
   private async fetchCandidateProperties(
     filters: RecommendationFilters,
   ): Promise<Property[]> {
+    // Hard filters applied at the SQL layer to prevent Gemini from seeing disallowed property types.
     const query = this.propertyRepository
       .createQueryBuilder('property')
       .leftJoinAndSelect('property.owner', 'owner')
       .leftJoinAndSelect('property.amenities', 'amenity')
       .where('property.status = :status', {
         status: PropertyStatus.Available,
-      });
+      })
+      .andWhere('property.deletedAt IS NULL');
 
-    if (filters.maxBudget) {
-      query.andWhere('property.price <= :maxBudget', {
-        maxBudget: filters.maxBudget,
+    if (filters.types.length) {
+      query.andWhere('property.type IN (:...types)', {
+        types: filters.types,
+      });
+    }
+
+    if (filters.priceMin != null) {
+      query.andWhere('property.price >= :priceMin', {
+        priceMin: filters.priceMin,
+      });
+    }
+
+    if (filters.priceMax != null) {
+      query.andWhere('property.price <= :priceMax', {
+        priceMax: filters.priceMax,
       });
     }
 
@@ -384,7 +574,25 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       });
     }
 
-    return query.orderBy('property.price', 'ASC').limit(20).getMany();
+    if (filters.district) {
+      query.andWhere('LOWER(property.district) = LOWER(:district)', {
+        district: filters.district,
+      });
+    }
+
+    if (filters.bedroomsMin != null) {
+      query.andWhere('property.bedrooms >= :bedroomsMin', {
+        bedroomsMin: filters.bedroomsMin,
+      });
+    }
+
+    if (filters.bathroomsMin != null) {
+      query.andWhere('property.bathrooms >= :bathroomsMin', {
+        bathroomsMin: filters.bathroomsMin,
+      });
+    }
+
+    return query.orderBy('property.price', 'ASC').limit(30).getMany();
   }
 
   private prepareDataset(
@@ -412,7 +620,11 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
       const cleanedPrice = this.winsorize(Number(property.price), priceLower, priceUpper);
       const cleanedArea = this.winsorize(Number(property.area), areaLower, areaUpper);
       const pricePerM2 = cleanedArea === 0 ? 0 : cleanedPrice / cleanedArea;
-      const locationMatchScore = this.computeLocationMatchScore(property, filters.city);
+      const locationMatchScore = this.computeLocationMatchScore(
+        property,
+        filters.city ?? undefined,
+        filters.district ?? undefined,
+      );
       const distanceToCity = Math.min(1, Math.max(0, 1 - locationMatchScore));
       const amenitiesMatchRatio = this.computeAmenitiesMatch(property, filters.requestedAmenities);
       const listingAgeDays = this.computeListingAgeDays(property);
@@ -608,21 +820,33 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     return `Phan cum ngan sach (K-means): ${summary}`;
   }
 
-  private computeLocationMatchScore(property: Property, city?: string): number {
+  private computeLocationMatchScore(
+    property: Property,
+    city?: string,
+    district?: string | null,
+  ): number {
     if (!city) {
       return 0.5;
     }
 
-    const cityLower = city.toLowerCase();
-    const propertyCity = property.city?.toLowerCase() ?? '';
-    const propertyDistrict = property.district?.toLowerCase() ?? '';
-    const address = property.address?.toLowerCase() ?? '';
+    const cityToken = this.normalizeMessage(city);
+    const propertyCity = this.normalizeMessage(property.city ?? '');
+    const propertyDistrict = this.normalizeMessage(property.district ?? '');
+    const addressToken = this.normalizeMessage(property.address ?? '');
+    const districtToken = district ? this.normalizeMessage(district) : '';
 
-    if (propertyCity === cityLower) {
-      return 1;
+    if (propertyCity === cityToken) {
+      if (districtToken && propertyDistrict === districtToken) {
+        return 1;
+      }
+      return 0.9;
     }
 
-    if (address.includes(cityLower) || propertyDistrict.includes(cityLower)) {
+    if (districtToken && propertyDistrict === districtToken) {
+      return 0.85;
+    }
+
+    if (addressToken.includes(cityToken) || propertyDistrict.includes(cityToken)) {
       return 0.7;
     }
 
@@ -772,8 +996,8 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     message: string,
     tenantId: number,
   ): Promise<string | null> {
-    const normalized = message.toLowerCase();
-    if (!/(hợp đồng|contract|ký kết|đã ký)/.test(normalized)) {
+    const normalized = this.normalizeMessage(message);
+    if (!/(hop dong|contract|ky ket|da ky)/.test(normalized)) {
       return null;
     }
 
@@ -813,9 +1037,9 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
     message: string,
     tenantId: number,
   ): Promise<string | null> {
-    const normalized = message.toLowerCase();
+    const normalized = this.normalizeMessage(message);
     if (
-      !/(giao dịch|transaction|thanh toán|payment|chuyển khoản)/.test(
+      !/(giao dich|transaction|thanh toan|payment|chuyen khoan)/.test(
         normalized,
       )
     ) {
@@ -848,7 +1072,7 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
   }
 
   private extractAmenities(message: string): string[] {
-    const normalized = message.toLowerCase();
+    const normalized = this.normalizeMessage(message);
     const keywords = [
       { key: 'wifi', aliases: ['wifi', 'wi-fi'] },
       { key: 'ac', aliases: ['ac', 'aircon', 'air conditioning', 'dieu hoa'] },
@@ -869,33 +1093,16 @@ Hãy trả lời với tối đa 2-3 đoạn ngắn cùng danh sách gạch đ�
 
     return Array.from(found);
   }
-  private extractBudget(message: string): number | undefined {
-    const budgetRegex =
-      /(?:giá|dưới|under|tối đa|max|budget|khoảng)\D*(\d+(?:[.,]\d+)?)(?:\s*)(triệu|tr|million|tỷ|ty|nghìn|ngan|k)?/i;
-    const match = message.match(budgetRegex);
-    if (!match) {
-      return undefined;
-    }
 
-    const value = parseFloat(match[1].replace(',', '.'));
-    const unit = match[2]?.toLowerCase();
-    if (!unit || unit === 'vnd') {
-      return value;
-    }
-
-    if (unit.includes('triệu') || unit === 'tr' || unit === 'million') {
-      return value * 1_000_000;
-    }
-
-    if (unit.includes('tỷ') || unit === 'ty') {
-      return value * 1_000_000_000;
-    }
-
-    if (unit.includes('nghìn') || unit.includes('ngan') || unit === 'k') {
-      return value * 1_000;
-    }
-
-    return value;
+  private normalizeMessage(message: string): string {
+    return message
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\u0111/g, 'd')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private extractCity(message: string): string | undefined {

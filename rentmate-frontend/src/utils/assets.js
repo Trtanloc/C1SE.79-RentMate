@@ -10,7 +10,15 @@ export const resolveAssetUrl = (raw) => {
   const url =
     typeof raw === 'string'
       ? raw
-      : raw?.image_path || raw?.path || raw?.url || raw?.href || '';
+      : raw?.avatar ||
+        raw?.avatarUrl ||
+        raw?.image ||
+        raw?.imageUrl ||
+        raw?.image_path ||
+        raw?.path ||
+        raw?.url ||
+        raw?.href ||
+        '';
   if (!url) {
     return null;
   }

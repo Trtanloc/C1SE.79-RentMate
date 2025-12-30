@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
 import { fallbackPropertyStatusMeta } from '../utils/constants.js';
@@ -22,6 +22,8 @@ const PropertyDetail = () => {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [creatingContract, setCreatingContract] = useState(false);
   const [contractError, setContractError] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(null);
+  const [ownerImageBroken, setOwnerImageBroken] = useState(false);
   const { propertyStatusMeta } = useMetadata();
   const { t } = useI18n();
   const { isAuthenticated, user } = useAuth();
@@ -50,6 +52,120 @@ const PropertyDetail = () => {
       .then((data) => setReviews(data))
       .catch(() => setReviews([]));
   }, [id]);
+
+  const amenities = Array.isArray(property?.amenities)
+    ? property.amenities
+        .map((item) => (typeof item === 'string' ? item : item.label))
+        .filter(Boolean)
+    : [];
+
+  const galleryImages = useMemo(() => {
+    if (!property) return [];
+    const rawSources = [
+      property.coverImage,
+      property.thumbnail,
+      property.heroImage,
+      property.image,
+      property.imageUrl,
+      ...(Array.isArray(property.imageUrls) ? property.imageUrls : []),
+      ...(Array.isArray(property.images) ? property.images : []),
+      ...(Array.isArray(property.photos) ? property.photos : []),
+    ].filter(Boolean);
+
+    const normalized = rawSources
+      .map((photo) => {
+        const raw =
+          typeof photo === 'string'
+            ? photo
+            : photo?.url ||
+              photo?.image ||
+              photo?.path ||
+              photo?.image_path ||
+              photo?.src ||
+              photo?.href;
+        const resolved = resolveAssetUrl(raw);
+        return resolved ? { raw: raw || resolved, resolved } : null;
+      })
+      .filter(Boolean);
+
+    const seen = new Set();
+    return normalized.filter((item) => {
+      if (seen.has(item.resolved)) return false;
+      seen.add(item.resolved);
+      return true;
+    });
+  }, [property]);
+
+  const heroImage = galleryImages[0]?.resolved;
+  const status = property?.status;
+  const statusLabel =
+    propertyStatusMeta[status]?.label ||
+    fallbackPropertyStatusMeta[status]?.label ||
+    status;
+  const mapEmbedSrc = toGoogleMapsEmbedUrl(
+    property?.mapEmbedUrl,
+    property?.address || property?.title,
+  );
+  const ownerAvatar = useMemo(
+    () =>
+      ownerImageBroken
+        ? null
+        : resolveAssetUrl(
+            property?.owner?.avatar ||
+              property?.owner?.avatarUrl ||
+              property?.owner?.user?.avatar ||
+              property?.owner?.user?.avatarUrl,
+          ),
+    [
+      ownerImageBroken,
+      property?.owner?.avatar,
+      property?.owner?.avatarUrl,
+      property?.owner?.user?.avatar,
+      property?.owner?.user?.avatarUrl,
+    ],
+  );
+  const ownerInitials = useMemo(() => {
+    const name =
+      property?.owner?.fullName ||
+      property?.owner?.name ||
+      property?.owner?.user?.fullName ||
+      'Landlord';
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
+  }, [
+    property?.owner?.fullName,
+    property?.owner?.name,
+    property?.owner?.user?.fullName,
+  ]);
+  const galleryPlaceholder =
+    'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"480\" viewBox=\"0 0 800 480\"><rect width=\"800\" height=\"480\" fill=\"%23e5e7eb\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23737480\" font-family=\"Arial\" font-size=\"22\">Image unavailable</text></svg>';
+  const previewImage = previewIndex !== null ? galleryImages[previewIndex]?.resolved : null;
+
+  useEffect(() => {
+    if (previewIndex !== null) {
+      const { style } = document.body;
+      const previous = style.overflow;
+      style.overflow = 'hidden';
+      return () => {
+        style.overflow = previous;
+      };
+    }
+    return undefined;
+  }, [previewIndex]);
+
+  useEffect(() => {
+    setOwnerImageBroken(false);
+  }, [
+    property?.owner?.avatar,
+    property?.owner?.avatarUrl,
+    property?.owner?.user?.avatar,
+    property?.owner?.user?.avatarUrl,
+  ]);
 
   if (loading) {
     return (
@@ -80,33 +196,32 @@ const PropertyDetail = () => {
     return null;
   }
 
-  const amenities = Array.isArray(property.amenities)
-    ? property.amenities
-        .map((item) => (typeof item === 'string' ? item : item.label))
-        .filter(Boolean)
-    : [];
+  const openPreview = (index) => {
+    if (!galleryImages.length) return;
+    setPreviewIndex(index);
+  };
 
-  const galleryImages = Array.isArray(property.photos)
-    ? property.photos
-        .map((photo) => {
-          const raw = typeof photo === 'string' ? photo : photo.url;
-          return {
-            raw,
-            resolved: resolveAssetUrl(raw),
-          };
-        })
-        .filter((item) => Boolean(item.resolved))
-    : [];
+  const closePreview = () => setPreviewIndex(null);
 
-  const heroImage = galleryImages[0]?.resolved;
-  const statusLabel =
-    propertyStatusMeta[property.status]?.label ||
-    fallbackPropertyStatusMeta[property.status]?.label ||
-    property.status;
-  const mapEmbedSrc = toGoogleMapsEmbedUrl(
-    property.mapEmbedUrl,
-    property.address || property.title,
-  );
+  const goPrev = () => {
+    if (!galleryImages.length || previewIndex === null) return;
+    setPreviewIndex((prev) =>
+      prev === null ? prev : (prev - 1 + galleryImages.length) % galleryImages.length,
+    );
+  };
+
+  const goNext = () => {
+    if (!galleryImages.length || previewIndex === null) return;
+    setPreviewIndex((prev) =>
+      prev === null ? prev : (prev + 1) % galleryImages.length,
+    );
+  };
+
+  const handleImageError = (event) => {
+    if (event.currentTarget.dataset.fallbackApplied === 'true') return;
+    event.currentTarget.dataset.fallbackApplied = 'true';
+    event.currentTarget.src = galleryPlaceholder;
+  };
 
   const handleReviewSubmit = async (event) => {
     event.preventDefault();
@@ -218,16 +333,29 @@ const PropertyDetail = () => {
               </h2>
               {galleryImages.length > 0 ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {galleryImages.map(({ raw, resolved }) => (
+                  {galleryImages.map(({ raw, resolved }, index) => (
                     <figure
                       key={raw || resolved}
                       className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100"
                     >
-                      <img
-                        src={resolved}
-                        alt={`${property.title} preview`}
-                        className="h-40 w-full object-cover transition duration-200 hover:scale-105"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => openPreview(index)}
+                        className="group relative block w-full"
+                      >
+                        <img
+                          src={resolved}
+                          alt={`${property.title} preview`}
+                          className="h-40 w-full object-cover transition duration-200 group-hover:scale-105"
+                          loading="lazy"
+                          onError={handleImageError}
+                        />
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition duration-200 group-hover:opacity-100">
+                          <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-gray-800">
+                            {t('property.detail.gallery.preview', 'View')}
+                          </span>
+                        </span>
+                      </button>
                     </figure>
                   ))}
                 </div>
@@ -415,11 +543,27 @@ const PropertyDetail = () => {
             )}
             {property.owner && (
               <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-                <p className="font-semibold text-gray-700">
-                  {property.owner.fullName}
-                </p>
-                <p>{property.owner.email}</p>
-                {property.owner.phone && <p>{property.owner.phone}</p>}
+                <div className="flex items-center gap-3">
+                  {ownerAvatar ? (
+                    <img
+                      src={ownerAvatar}
+                      alt={property.owner.fullName || 'Landlord'}
+                      className="h-12 w-12 rounded-full object-cover"
+                      onError={() => setOwnerImageBroken(true)}
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                      {ownerInitials || 'LD'}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-700">
+                      {property.owner.fullName}
+                    </p>
+                    <p className="truncate">{property.owner.email}</p>
+                    {property.owner.phone && <p>{property.owner.phone}</p>}
+                  </div>
+                </div>
               </div>
             )}
             {mapEmbedSrc && (
@@ -450,6 +594,52 @@ const PropertyDetail = () => {
           </aside>
         </div>
       </div>
+      {previewImage && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-4">
+          <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <p className="text-sm font-semibold text-gray-800">
+                {t('property.detail.gallery.preview', 'View')}
+              </p>
+              <div className="flex items-center gap-2">
+                {galleryImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                    >
+                      {'<'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                    >
+                      {'>'}
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={closePreview}
+                  className="rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-white transition hover:bg-gray-700"
+                >
+                  {t('property.detail.gallery.close', 'Close')}
+                </button>
+              </div>
+            </div>
+            <div className="bg-black">
+              <img
+                src={previewImage}
+                alt={`${property.title} enlarged`}
+                className="mx-auto max-h-[70vh] w-full object-contain"
+                onError={handleImageError}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

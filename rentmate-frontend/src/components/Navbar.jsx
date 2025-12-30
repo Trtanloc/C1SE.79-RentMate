@@ -197,7 +197,7 @@ const Navbar = () => {
           className={`relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:text-primary ${
             variant === 'desktop' ? '' : 'w-full justify-start px-4'
           }`}
-          aria-label="Notifications"
+          aria-label={t('nav.notification', 'Notifications')}
           onClick={() => setMobileOpen(false)}
         >
           <Bell className="h-4 w-4" />
@@ -229,7 +229,7 @@ const Navbar = () => {
             variant === 'desktop' ? '' : 'w-full text-center'
           }`}
         >
-          Log out
+          {t('nav.logout', 'Log out')}
         </button>
       </>
     ) : (
@@ -299,11 +299,11 @@ const Navbar = () => {
             <button
               type="button"
               className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 text-gray-700 md:hidden"
-              onClick={() => setMobileOpen((prev) => !prev)}
-              aria-label="Toggle navigation"
-            >
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+          onClick={() => setMobileOpen((prev) => !prev)}
+          aria-label={t('nav.toggle', 'Toggle navigation')}
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
           </div>
 
           <div className="hidden flex-col gap-3 border-t border-gray-100/80 pb-4 pt-3 md:flex">
@@ -311,16 +311,16 @@ const Navbar = () => {
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-x-auto">
                 {navItems.map((item) => renderNavLink(item, 'desktop'))}
               </div>
-              <button
-                type="button"
-                onClick={toggle}
-                className="flex items-center gap-1 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
-              >
-                <Globe2 className="h-4 w-4" />
-                {lang === 'en' ? 'EN' : 'VI'}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={toggle}
+              className="flex items-center gap-1 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+            >
+              <Globe2 className="h-4 w-4" />
+              {lang === 'en' ? t('nav.langShort.en', 'EN') : t('nav.langShort.vi', 'VI')}
+            </button>
           </div>
+        </div>
         </div>
 
         {mobileOpen && (
@@ -335,7 +335,7 @@ const Navbar = () => {
               className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
             >
               <Globe2 className="h-4 w-4" />
-              {lang === 'en' ? 'English' : 'Vietnamese'}
+              {lang === 'en' ? t('nav.lang.en', 'English') : t('nav.lang.vi', 'Vietnamese')}
             </button>
             <div className="flex flex-col gap-2 pt-2">{renderAuthButtons('mobile')}</div>
           </div>

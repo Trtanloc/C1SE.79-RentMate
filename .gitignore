@@ -16,6 +16,9 @@ logs/
 # Docker
 mysql-data/
 
+# Temp artifacts
+temp/
+
 # Vite cache
 .vite/
 **/.vite/

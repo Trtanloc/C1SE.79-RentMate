@@ -17,14 +17,7 @@ const formatCount = (value, t) => {
   return `${value.toLocaleString('vi-VN')} ${t('category.count', 'live listings')}`;
 };
 
-const formatPrice = (value, t) => {
-  if (value === null || value === undefined) {
-    return t('category.noPrice', 'No pricing data yet');
-  }
-  return `${Number(value).toLocaleString('vi-VN')} VND`;
-};
-
-const CategoryHighlights = ({ categories = [], error = null, onSelect, canViewFinancial = false }) => {
+const CategoryHighlights = ({ categories = [], error = null, onSelect }) => {
   const { t } = useI18n();
   const list = categories.length ? categories : Array.from({ length: 6 }, () => null);
 
@@ -32,13 +25,13 @@ const CategoryHighlights = ({ categories = [], error = null, onSelect, canViewFi
     <section className="mt-12 space-y-6">
       <div className="flex flex-col gap-2">
         <p className="text-xs uppercase tracking-[0.4em] text-gray-400">
-          {t('category.title', 'Product mix')}
+          {t('category.kicker', 'Property categories')}
         </p>
         <h2 className="text-3xl font-semibold text-brand">
-          {t('category.title', 'Categories backed by data')}
+          {t('category.title', 'Property Categories')}
         </h2>
         <p className="text-sm text-gray-500">
-          {t('category.subtitle', 'The stats below are aggregated from active listings in the backend.')}
+          {t('category.subtitle', 'Browse available listings')}
         </p>
       </div>
       {error && (
@@ -85,15 +78,8 @@ const CategoryHighlights = ({ categories = [], error = null, onSelect, canViewFi
                     t('category.loading', 'We are aggregating live inventory to build this highlight.')}
                 </p>
               </div>
-              <div className="flex items-center justify-between text-sm font-semibold text-brand">
+              <div className="flex items-center text-sm font-semibold text-brand">
                 <span>{category ? formatCount(category.count, t) : '--'}</span>
-                <span className="rounded-full bg-white/80 px-3 py-1 text-xs text-gray-600">
-                  {category
-                    ? canViewFinancial && category.averagePrice !== null && category.averagePrice !== undefined
-                      ? formatPrice(category.averagePrice, t)
-                      : t('category.protected', 'Visible to landlords/admin only')
-                    : '--'}
-                </span>
               </div>
             </article>
           );

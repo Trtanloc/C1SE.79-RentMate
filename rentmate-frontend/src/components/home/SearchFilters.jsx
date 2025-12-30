@@ -3,6 +3,7 @@ import { DollarSign, MapPin, Search as SearchIcon, SlidersHorizontal, X } from '
 import { useI18n } from '../../i18n/useI18n.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { getCityLabel } from '../../utils/cities.js';
+import { getPropertyTypeLabel } from '../../utils/propertyTypeLabels.js';
 
 const SearchFilters = ({ onSearch, propertyTypes = [], cities = [] }) => {
   const { t } = useI18n();
@@ -116,10 +117,10 @@ const SearchFilters = ({ onSearch, propertyTypes = [], cities = [] }) => {
             }
             className="w-full appearance-none bg-transparent text-sm text-gray-700 outline-none"
           >
-            <option value="">{t('search.anyType', 'Any type')}</option>
+            <option value="">{t('propertyType.all', 'All property types')}</option>
             {safeTypes.map((type) => (
               <option key={type.value} value={type.value}>
-                {type.label}
+                {type.label ?? getPropertyTypeLabel(type.value, t)}
               </option>
             ))}
           </select>
@@ -151,7 +152,11 @@ const SearchFilters = ({ onSearch, propertyTypes = [], cities = [] }) => {
               >
                 <Icon className="h-3.5 w-3.5" />
                 <span>
-                  {filter.key === 'city' ? getCityLabel(filter.value, lang) : filter.value}
+                  {filter.key === 'city'
+                    ? getCityLabel(filter.value, lang)
+                    : filter.key === 'propertyType'
+                      ? getPropertyTypeLabel(filter.value, t)
+                      : filter.value}
                 </span>
                 <button
                   type="button"
@@ -236,7 +241,7 @@ const SearchFilters = ({ onSearch, propertyTypes = [], cities = [] }) => {
                     : 'border-gray-200 hover:border-primary/40 hover:text-primary'
                 }`}
               >
-                {filter.label}
+                {filter.label ?? getPropertyTypeLabel(filter.value, t)}
               </button>
             );
           })

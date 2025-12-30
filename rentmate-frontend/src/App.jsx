@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';
@@ -26,20 +26,42 @@ import axiosClient from './api/axiosClient.js';
 
 const App = () => {
   const location = useLocation();
+  const lastTrackedPathRef = useRef(null);
 
   useEffect(() => {
+    const path = location.pathname;
+    const prevPath = lastTrackedPathRef.current;
+    let lastTrackedPath = null;
+
+    try {
+      lastTrackedPath = sessionStorage.getItem('rentmate:lastTrackedPath');
+    } catch {
+      lastTrackedPath = null;
+    }
+
+    const pathChanged = prevPath !== path;
+    const alreadyTrackedThisSession = lastTrackedPath === path;
+    lastTrackedPathRef.current = path;
+    if (!pathChanged || alreadyTrackedThisSession) return;
+
     const track = async () => {
       try {
         await axiosClient.post('/stats/track-visit', {
-          path: `${location.pathname}${location.search}`,
+          path,
           referrer: document.referrer || undefined,
         });
       } catch {
         // ignore tracking errors
       }
     };
+    try {
+      sessionStorage.setItem('rentmate:lastTrackedPath', path);
+    } catch {
+      // ignore storage errors
+    }
+
     track();
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,6 +132,14 @@ const App = () => {
             element={
               <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
                 <ContractsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/contracts/:id"
+            element={
+              <ProtectedRoute roles={[UserRole.Admin, UserRole.Manager, UserRole.Landlord, UserRole.Tenant]}>
+                <ContractPreviewPage />
               </ProtectedRoute>
             }
           />

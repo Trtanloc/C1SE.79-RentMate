@@ -238,6 +238,48 @@ const AdminPage = () => {
   const [trafficStats, setTrafficStats] = useState(null);
   const [trafficLoading, setTrafficLoading] = useState(true);
   const [userActionId, setUserActionId] = useState(null);
+  const formatPagePath = (value) => {
+    if (!value) return 'N/A';
+    const lower = value.toLowerCase();
+    if (lower === '/') return 'Home';
+    if (lower.startsWith('/properties/')) return 'Property details';
+    if (lower.startsWith('/contracts/')) return 'Contract details';
+    if (lower.startsWith('/payments/')) return 'Payment details';
+
+    const namedRoutes = {
+      '/properties': 'Properties',
+      '/contracts': 'Contracts',
+      '/dashboard': 'Dashboard',
+      '/favorites': 'Favorites',
+      '/messages': 'Messages',
+      '/notifications': 'Notifications',
+      '/profile': 'Profile',
+      '/payments': 'Payments',
+      '/login': 'Login',
+      '/register': 'Register',
+      '/apply-landlord': 'Landlord application',
+      '/admin': 'Admin',
+    };
+
+    if (namedRoutes[lower]) return namedRoutes[lower];
+
+    const trimmed = value.replace(/^\/+/, '');
+    if (!trimmed) return 'Home';
+    const firstSegment = trimmed.split('/')[0];
+    return firstSegment
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+  const formattedTopPages = useMemo(
+    () =>
+      (trafficStats?.topPages || []).map((page) => ({
+        ...page,
+        displayPath: formatPagePath(page.path),
+      })),
+    [trafficStats?.topPages],
+  );
+  const topPageLabel = formattedTopPages[0]?.displayPath || 'N/A';
 
   const statusFilters = useMemo(() => {
     const metaOptions =
@@ -456,6 +498,20 @@ const AdminPage = () => {
     );
   }, [trafficByDay]);
 
+  const trackedDays = trafficByDay.length;
+  const trackedDaysLabel =
+    trackedDays === 0
+      ? 'No tracked days'
+      : trackedDays === 1
+        ? 'Data from 1 day'
+        : `Data from ${trackedDays} days`;
+  const chartRangeLabel =
+    trackedDays === 0
+      ? 'No range yet'
+      : trackedDays === 1
+        ? 'Single day'
+        : `Last ${trackedDays} days`;
+
   const userStatusOptions = useMemo(
     () => [
       { value: 'all', label: 'All statuses' },
@@ -537,7 +593,7 @@ const AdminPage = () => {
               <div>
                 <h2 className="text-xl font-semibold text-gray-800">Traffic &amp; visits</h2>
                 <p className="text-sm text-gray-500">
-                  Last 14 days of tracked page views (auto-captured on navigation).
+                  Recent tracked page views (auto-captured on navigation).
                 </p>
               </div>
               <button
@@ -567,13 +623,14 @@ const AdminPage = () => {
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                     <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Tracked days</p>
                     <p className="mt-2 text-2xl font-semibold text-gray-800">
-                      {trafficByDay.length || 0}
+                      {trackedDays}
                     </p>
+                    <p className="text-xs text-gray-500">{trackedDaysLabel}</p>
                   </div>
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                     <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Top page</p>
                     <p className="mt-2 text-sm font-semibold text-gray-800 truncate">
-                      {trafficStats.topPages?.[0]?.path || '—'}
+                      {topPageLabel}
                     </p>
                   </div>
                 </div>
@@ -582,17 +639,23 @@ const AdminPage = () => {
                   <div>
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-gray-800">Visits per day</h3>
-                      <span className="text-xs text-gray-500">Last {trafficByDay.length || 0} days</span>
+                      <span className="text-xs text-gray-500">{chartRangeLabel}</span>
                     </div>
                     {trafficByDay.length === 0 ? (
                       <p className="mt-3 text-sm text-gray-500">No visits recorded yet.</p>
                     ) : (
                       <div className="mt-3 space-y-2">
                         {trafficByDay.map((item) => {
-                          const width =
+                          const widthPercent =
                             maxVisitsByDay > 0
-                              ? Math.max((item.count / maxVisitsByDay) * 100, 6)
+                              ? Math.round((item.count / maxVisitsByDay) * 100)
                               : 0;
+                          const normalizedWidth =
+                            maxVisitsByDay === 0
+                              ? 0
+                              : trafficByDay.length === 1
+                                ? 55
+                                : Math.min(100, Math.max(widthPercent, 12));
                           return (
                             <div key={item.date} className="flex items-center gap-3">
                               <span className="w-24 text-xs text-gray-500">
@@ -604,7 +667,7 @@ const AdminPage = () => {
                               <div className="h-2 flex-1 rounded-full bg-gray-100">
                                 <div
                                   className="h-2 rounded-full bg-gradient-to-r from-primary to-amber-400"
-                                  style={{ width: `${width}%` }}
+                                  style={{ width: `${normalizedWidth}%` }}
                                 ></div>
                               </div>
                               <span className="w-10 text-right text-xs font-semibold text-gray-700">
@@ -622,19 +685,19 @@ const AdminPage = () => {
                       <h3 className="text-sm font-semibold text-gray-800">Most viewed pages</h3>
                       <span className="text-xs text-gray-500">Top 5</span>
                     </div>
-                    {trafficStats.topPages?.length ? (
+                    {formattedTopPages.length ? (
                       <div className="mt-3 overflow-hidden rounded-xl border border-gray-100">
                         <table className="min-w-full text-sm">
                           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
                             <tr>
-                              <th className="px-4 py-2">Path</th>
+                              <th className="px-4 py-2">Page</th>
                               <th className="px-4 py-2 text-right">Views</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {trafficStats.topPages.map((page) => (
-                              <tr key={page.path} className="border-t border-gray-100 text-gray-700">
-                                <td className="px-4 py-2 font-medium">{page.path}</td>
+                            {formattedTopPages.map((page) => (
+                              <tr key={page.path || page.displayPath} className="border-t border-gray-100 text-gray-700">
+                                <td className="px-4 py-2 font-medium">{page.displayPath}</td>
                                 <td className="px-4 py-2 text-right font-semibold">{page.count}</td>
                               </tr>
                             ))}

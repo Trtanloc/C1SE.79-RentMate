@@ -10,6 +10,7 @@ import { useI18n } from '../i18n/useI18n.js';
 import { fallbackCities, getCityLabel } from '../utils/cities.js';
 import { fetchProvinces, fetchDistricts, fetchWards } from '../api/locationApi.js';
 import { toGoogleMapsEmbedUrl } from '../utils/maps.js';
+import { getPropertyTypeLabel } from '../utils/propertyTypeLabels.js';
 
 const createEmptyForm = (defaults) => ({
   title: '',
@@ -786,7 +787,7 @@ const Dashboard = () => {
             </div>
             <div>
               <label htmlFor="mapEmbedUrl" className="mb-1 block text-sm font-medium text-gray-700">
-                Map / Embed URL (tùy chọn)
+                {t('dashboard.form.mapEmbedUrl')}
               </label>
               <input
                 id="mapEmbedUrl"
@@ -799,7 +800,7 @@ const Dashboard = () => {
             </div>
             <div>
               <label htmlFor="virtualTourUrl" className="mb-1 block text-sm font-medium text-gray-700">
-                Tour 360 URL (tùy chọn)
+                {t('dashboard.form.virtualTour')}
               </label>
               <input
                 id="virtualTourUrl"
@@ -890,10 +891,10 @@ const Dashboard = () => {
                 onChange={handleChange}
                 className={fieldClass('type')}
               >
-                <option value="">{t('search.anyType', 'Any type')}</option>
+                <option value="">{t('propertyType.all', 'All property types')}</option>
                 {propertyTypes.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {option.label ?? getPropertyTypeLabel(option.value, t)}
                   </option>
                 ))}
               </select>
@@ -1029,3 +1030,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

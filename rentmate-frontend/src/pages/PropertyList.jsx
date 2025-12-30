@@ -6,11 +6,7 @@ import { useMetadata } from '../context/MetadataContext.jsx';
 import { useI18n } from '../i18n/useI18n.js';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { getCityLabel } from '../utils/cities.js';
-
-const stripAccents = (value = '') =>
-  String(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+import { getPropertyTypeLabel } from '../utils/propertyTypeLabels.js';
 
 const useQueryFilters = (searchString) =>
   useMemo(() => {
@@ -78,15 +74,14 @@ const PropertyList = () => {
 
   const typeLabel = useMemo(() => {
     const safeTypes = Array.isArray(propertyTypes) ? propertyTypes : [];
-    const displayLabel = (item) =>
-      lang === 'vi'
-        ? item?.labelVi || item?.label || item?.value
-        : stripAccents(item?.label || item?.value || '');
     const map = new Map(
-      safeTypes.map((item) => [item?.value, displayLabel(item)]),
+      safeTypes.map((item) => [
+        item?.value,
+        getPropertyTypeLabel(item?.value, t, item?.label || item?.labelVi || item?.value),
+      ]),
     );
-    return (value) => map.get(value) || value || '';
-  }, [propertyTypes, lang]);
+    return (value) => getPropertyTypeLabel(value, t, map.get(value) || value || '');
+  }, [propertyTypes, t]);
   const cityDisplay = (city) => getCityLabel(city, lang);
 
   const activeFilters = [
@@ -151,12 +146,10 @@ const PropertyList = () => {
                 onChange={(event) => setTypeFilter(event.target.value)}
                 className="rounded-full border border-gray-200 px-3 py-1 outline-none focus:border-primary"
               >
-                <option value="">{t('search.anyType', 'Any type')}</option>
+                <option value="">{t('propertyType.all', 'All property types')}</option>
                 {(Array.isArray(propertyTypes) ? propertyTypes : []).map((type) => (
                   <option key={type.value} value={type.value}>
-                    {lang === 'vi'
-                      ? type.labelVi || type.label || type.value
-                      : stripAccents(type.label || type.value)}
+                    {type.label || getPropertyTypeLabel(type.value, t)}
                   </option>
                 ))}
               </select>

@@ -29,7 +29,7 @@ const Login = () => {
       const redirectTo = location.state?.from?.pathname || '/';
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      const message = err.response?.data?.message || 'Unable to login';
+      const message = err.response?.data?.message || t('login.error');
       setError(Array.isArray(message) ? message.join(', ') : message);
     } finally {
       setIsSubmitting(false);
@@ -38,9 +38,7 @@ const Login = () => {
 
   const beginFacebookOAuth = (intent = 'login') => {
     const apiBase =
-      import.meta.env.VITE_API_BASE_URL ||
-      import.meta.env.VITE_API_URL ||
-      '/api';
+      import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api';
     const returnUrl =
       location.state?.from?.pathname && location.state.from.pathname !== '/login'
         ? location.state.from.pathname
@@ -57,16 +55,12 @@ const Login = () => {
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-10">
-      <h1 className="mb-6 text-3xl font-semibold text-gray-800">
-        {t('login.heading', 'Welcome back')}
-      </h1>
-      <p className="mb-8 text-sm text-gray-500">
-        {t('login.subheading', 'Enter your credentials to access your RentMate dashboard.')}
-      </p>
+      <h1 className="mb-6 text-3xl font-semibold text-gray-800">{t('login.heading')}</h1>
+      <p className="mb-8 text-sm text-gray-500">{t('login.subheading')}</p>
       <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl bg-white p-6 shadow-sm">
         <div>
           <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
-            {t('login.email', 'Email')}
+            {t('login.email')}
           </label>
           <input
             id="email"
@@ -81,7 +75,7 @@ const Login = () => {
         </div>
         <div>
           <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
-            {t('login.password', 'Password')}
+            {t('login.password')}
           </label>
           <input
             id="password"
@@ -100,15 +94,13 @@ const Login = () => {
               type="checkbox"
               name="remember"
               checked={form.remember}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, remember: e.target.checked }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, remember: e.target.checked }))}
               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/40"
             />
-            Ghi nhớ đăng nhập
+            {t('login.remember')}
           </label>
           <Link to="/forgot-password" className="text-primary hover:underline">
-            Quên mật khẩu?
+            {t('login.forgotPassword')}
           </Link>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
@@ -117,7 +109,7 @@ const Login = () => {
           disabled={isSubmitting}
           className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? t('login.submit', 'Signing in...') : t('login.submit', 'Login')}
+          {isSubmitting ? t('login.submitLoading') : t('login.submit')}
         </button>
         <div className="grid gap-3 sm:grid-cols-2">
           <button
@@ -126,7 +118,7 @@ const Login = () => {
             onClick={() => beginFacebookOAuth('login')}
             className="w-full rounded-xl border border-blue-600 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Đăng nhập bằng Facebook
+            {t('login.facebookLogin')}
           </button>
           <button
             type="button"
@@ -134,13 +126,13 @@ const Login = () => {
             onClick={() => beginFacebookOAuth('register')}
             className="w-full rounded-xl border border-blue-100 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Đăng ký bằng Facebook
+            {t('login.facebookRegister')}
           </button>
         </div>
         <p className="text-center text-xs text-gray-500">
-          {t('login.noAccount', 'New to RentMate?')}{' '}
+          {t('login.noAccount')}{' '}
           <Link to="/register" className="font-medium text-primary">
-            {t('login.create', 'Create an account')}
+            {t('login.create')}
           </Link>
         </p>
       </form>

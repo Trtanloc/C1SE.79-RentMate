@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useI18n } from '../i18n/useI18n.js';
 
 const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) => {
   const [showModal, setShowModal] = useState(false);
@@ -10,19 +11,20 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const handleDeposit = async () => {
     if (!amount || amount < 100000) {
-      alert('Số tiền đặt cọc phải từ 100.000 VND trở lên');
+      alert(t('deposit.error.minAmount'));
       return;
     }
   
     const propertyIdNum = Number(propertyId);
     const landlordIdNum = Number(landlordId);
     const tenantIdNum = Number(user?.id);
-  
+
     if (isNaN(propertyIdNum) || isNaN(landlordIdNum) || isNaN(tenantIdNum)) {
-      alert('Lỗi hệ thống: Thiếu thông tin người dùng/bất động sản');
+      alert(t('deposit.error.missingIds'));
       return;
     }
   
@@ -37,7 +39,7 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
         paymentMethod,
         propertyTitle,
         landlordName,
-        tenantName: user?.fullName || 'Người thuê',
+        tenantName: user?.fullName || t('deposit.fallback.tenant'),
       });
   
       // Fixed: chỉ khai báo biến contractCode một lần
@@ -46,16 +48,16 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
         response.data?.data?.contract_code ||
         response.data?.data?.contractCode ||
         response.data?.contractCode;
-  
+
       if (!contractCode) {
-        throw new Error('Không nhận được mã hợp đồng từ server');
+        throw new Error(t('deposit.error.noContract'));
       }
   
       navigate(`/payment/${contractCode}`);
   
     } catch (error) {
       console.error('Lỗi tạo đặt cọc:', error);
-      alert(error.response?.data?.message || 'Không thể tạo đặt cọc. Vui lòng thử lại.');
+      alert(error.response?.data?.message || t('deposit.error.generic'));
     } finally {
       setLoading(false);
       setShowModal(false);
@@ -70,32 +72,32 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
         className="w-full rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-green-600 hover:to-green-700"
         type="button"
       >
-        📝 Đặt cọc ngay
+        {t('deposit.open')}
       </button>
 
       {/* Modal nhập thông tin */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="w-full max-w-md rounded-lg bg-white p-6">
-            <h3 className="mb-4 text-xl font-bold">Đặt cọc thuê nhà</h3>
+            <h3 className="mb-4 text-xl font-bold">{t('deposit.title')}</h3>
 
             <div className="mb-4">
-              <label className="mb-2 block">Số tiền đặt cọc (VND)</label>
+              <label className="mb-2 block">{t('deposit.amountLabel')}</label>
               <input
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="w-full rounded border border-gray-200 px-3 py-2"
-                placeholder="Nhập số tiền"
+                placeholder={t('deposit.amountPlaceholder')}
                 min="100000"
               />
               <p className="mt-1 text-sm text-gray-500">
-                Thông thường: 1-3 tháng tiền nhà
+                {t('deposit.amountHint')}
               </p>
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block">Phương thức thanh toán</label>
+              <label className="mb-2 block">{t('deposit.paymentMethod')}</label>
               <div className="flex space-x-4">
                 <button
                   onClick={() => setPaymentMethod('momo')}
@@ -108,13 +110,13 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
                   <div className="flex items-center">
                     <img
                       src="/momo-logo.png"
-                      alt="MoMo"
-                      className="mr-2 h-8 w-8"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                    <span>Ví MoMo</span>
+                    alt="MoMo"
+                    className="mr-2 h-8 w-8"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                    <span>{t('deposit.momo')}</span>
                   </div>
                 </button>
 
@@ -129,13 +131,13 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
                   <div className="flex items-center">
                     <img
                       src="/vnpay-logo.png"
-                      alt="VNPay"
-                      className="mr-2 h-8 w-8"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                    <span>VNPay</span>
+                    alt="VNPay"
+                    className="mr-2 h-8 w-8"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                    <span>{t('deposit.vnpay')}</span>
                   </div>
                 </button>
               </div>
@@ -146,14 +148,14 @@ const DepositButton = ({ propertyId, landlordId, propertyTitle, landlordName }) 
                 onClick={() => setShowModal(false)}
                 className="rounded px-4 py-2 border border-gray-200"
               >
-                Hủy
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleDeposit}
                 disabled={loading}
                 className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
               >
-                {loading ? 'Đang xử lý...' : 'Tiếp tục'}
+                {loading ? t('common.loading') : t('common.continue')}
               </button>
             </div>
           </div>

@@ -11,6 +11,7 @@ const ProfilePage = () => {
     phone: '',
     bio: '',
     avatarUrl: '',
+    avatar: '',
   });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -37,7 +38,8 @@ const ProfilePage = () => {
           email: profile.email || '',
           phone: profile.phone || '',
           bio: profile.bio || '',
-          avatarUrl: profile.avatarUrl || '',
+          avatarUrl: profile.avatarUrl || profile.avatar || '',
+          avatar: profile.avatar || profile.avatarUrl || '',
         }));
       } catch (err) {
         setError(
@@ -89,7 +91,10 @@ const ProfilePage = () => {
     }
   };
 
-  const avatarPreview = useMemo(() => resolveAssetUrl(form.avatarUrl), [form.avatarUrl]);
+  const avatarPreview = useMemo(
+    () => resolveAssetUrl(form.avatarUrl || form.avatar),
+    [form.avatar, form.avatarUrl],
+  );
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();

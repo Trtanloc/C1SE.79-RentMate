@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -27,6 +27,45 @@ const PaymentsPage = () => {
   const isTenant = user?.role === UserRole.Tenant;
   const isLandlord = user?.role === UserRole.Landlord;
 
+  const normalizeContractCode = (payment) =>
+    payment?.contract?.contract_code ||
+    payment?.contractCode ||
+    payment?.gateway_response?.contractCode ||
+    payment?.paymentCode ||
+    payment?.payment_code ||
+    payment?.contract?.code ||
+    null;
+
+  const statusWeight = (status) => {
+    const value = (status || '').toLowerCase();
+    if (value === 'paid' || value === 'completed') return 3;
+    if (value === 'waiting_confirmation') return 2;
+    if (value === 'pending' || value === 'unpaid') return 1;
+    return 0;
+  };
+
+  const dedupePayments = (list = []) => {
+    const map = new Map();
+    [...list]
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0) -
+          new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0),
+      )
+      .forEach((item) => {
+        const code = normalizeContractCode(item) || item.id;
+        const existing = map.get(code);
+        if (!existing) {
+          map.set(code, item);
+          return;
+        }
+        if (statusWeight(item.status) > statusWeight(existing.status)) {
+          map.set(code, item);
+        }
+      });
+    return Array.from(map.values());
+  };
+
   useEffect(() => {
     if (isAdmin) {
       fetchAdminPayments();
@@ -46,7 +85,7 @@ const PaymentsPage = () => {
     try {
       const params = keyword ? { search: keyword.trim() } : {};
       const { data } = await axiosClient.get('/admin/payments', { params });
-      setPayments(data?.data || []);
+      setPayments(dedupePayments(data?.data || []));
     } catch (err) {
       const message = err?.response?.data?.message || 'Không tải được danh sách thanh toán.';
       setError(Array.isArray(message) ? message.join(', ') : message);
@@ -62,7 +101,7 @@ const PaymentsPage = () => {
       const { data } = await axiosClient.get('/deposit/my-payments', {
         params: { role },
       });
-      setPayments(data?.data || []);
+      setPayments(dedupePayments(data?.data || []));
     } catch (err) {
       const message = err?.response?.data?.message || 'Không tải được lịch sử thanh toán.';
       setError(Array.isArray(message) ? message.join(', ') : message);

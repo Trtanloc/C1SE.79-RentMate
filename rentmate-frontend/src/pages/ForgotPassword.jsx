@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axiosClient from '../api/axiosClient.js';
+import { useI18n } from '../i18n/useI18n.js';
 
 const ForgotPasswordPage = () => {
   const [params] = useSearchParams();
   const tokenFromUrl = params.get('token') || '';
+  const { t } = useI18n();
 
   const [step, setStep] = useState(tokenFromUrl ? 'reset' : 'request');
   const [form, setForm] = useState({
@@ -38,15 +40,10 @@ const ForgotPasswordPage = () => {
     setMessage(null);
     try {
       await axiosClient.post('/auth/forgot-password', { email: form.email });
-      setMessage(
-        'If an account exists for that email, a reset link has been sent.',
-      );
+      setMessage(t('forgot.request.success'));
       setStep('reset');
     } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          'Unable to send reset link right now. Please try again.',
-      );
+      setError(err?.response?.data?.message || t('forgot.request.error'));
     } finally {
       setLoading(false);
     }
@@ -59,12 +56,12 @@ const ForgotPasswordPage = () => {
     setMessage(null);
     const token = tokenFromUrl || form.token;
     if (!token) {
-      setError('Reset token is required.');
+      setError(t('forgot.error.token'));
       setLoading(false);
       return;
     }
     if (form.password !== form.confirmPassword) {
-      setError('Password confirmation does not match.');
+      setError(t('forgot.error.mismatch'));
       setLoading(false);
       return;
     }
@@ -74,38 +71,31 @@ const ForgotPasswordPage = () => {
         password: form.password,
         confirmPassword: form.confirmPassword,
       });
-      setMessage('Password updated successfully. You can sign in again now.');
+      setMessage(t('forgot.reset.success'));
       setForm((prev) => ({
         ...prev,
         password: '',
         confirmPassword: '',
-        token: tokenFromUrl ? prev.token : '',
       }));
+      setStep('request');
     } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          'Unable to reset password right now. Please try again.',
-      );
+      setError(err?.response?.data?.message || t('forgot.reset.error'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <section className="mx-auto max-w-md px-4 py-12">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-gray-800">
-          Quên mật khẩu
-        </h1>
-        <p className="text-sm text-gray-500">
-          Nhập email để nhận link đặt lại mật khẩu hoặc dán token nếu bạn đã có.
-        </p>
+    <section className="mx-auto max-w-lg px-4 py-10">
+      <div className="rounded-3xl bg-white p-6 shadow-lg">
+        <h1 className="text-2xl font-semibold text-gray-800">{t('forgot.heading')}</h1>
+        <p className="mt-2 text-sm text-gray-500">{t('forgot.description')}</p>
 
         {step === 'request' && (
           <form onSubmit={handleRequest} className="mt-4 space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Email
+                {t('forgot.email')}
               </label>
               <input
                 type="email"
@@ -123,7 +113,7 @@ const ForgotPasswordPage = () => {
               disabled={loading}
               className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50"
             >
-              {loading ? 'Đang gửi...' : 'Gửi liên kết đặt lại'}
+              {loading ? t('forgot.request.loading') : t('forgot.request.submit')}
             </button>
           </form>
         )}
@@ -133,7 +123,7 @@ const ForgotPasswordPage = () => {
             {!tokenFromUrl && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Token đặt lại
+                  {t('forgot.token')}
                 </label>
                 <input
                   name="token"
@@ -146,7 +136,7 @@ const ForgotPasswordPage = () => {
             )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Mật khẩu mới
+                {t('forgot.newPassword')}
               </label>
               <input
                 name="password"
@@ -159,7 +149,7 @@ const ForgotPasswordPage = () => {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Xác nhận mật khẩu mới
+                {t('forgot.confirmPassword')}
               </label>
               <input
                 name="confirmPassword"
@@ -177,7 +167,7 @@ const ForgotPasswordPage = () => {
               disabled={loading}
               className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50"
             >
-              {loading ? 'Đang lưu...' : 'Đặt lại mật khẩu'}
+              {loading ? t('forgot.reset.loading') : t('forgot.reset.submit')}
             </button>
           </form>
         )}
